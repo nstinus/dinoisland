@@ -2,6 +2,7 @@ from sys import path
 path.append("/usr/lib/python2.6/site-packages")
 
 import threading
+from copy import deepcopy
 
 from dinoisland import Dinosaur
 from dinoisland.ttypes import EntityType, Direction, Coordinate
@@ -10,6 +11,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 
 import logging
+
 
 logger = logging.getLogger("main")
 logger.setLevel(logging.DEBUG)
@@ -36,9 +38,12 @@ class MapManager:
         self.sightings.append(sighting)
 
     def findClosest(self, position, type):
-        l = sorted([i.alterCoordsToRelative(position) for i in self.sightings if i.type == type])
+        # logger.debug("Sightings: %s" % self.sightings)
+        self.sightings = [i for i in self.sightings if i.coordinate != position]
+        # logger.debug("Sightings: %s" % self.sightings)
+        l = sorted([deepcopy(i).alterCoordsToRelative(position) for i in self.sightings if i.type == type])
         if len(l) > 0:
-            return l[0]
+            return l
         return None
 
     def getDirections(self, position, coords):
@@ -90,23 +95,34 @@ class Dino(Dinosaur.Client, threading.Thread):
         threading.Thread.__init__(self, name=name)
 
     def move(self, dir):
-        logger.info("Try move to: %s" % dir)
+        logger.info("Try move to: %s" % Direction._VALUES_TO_NAMES[dir])
         mr = Dinosaur.Client.move(self, dir)
         logger.info(mr.message)
         if mr.succeeded:
-            logger.info("position was %s" % self.position)
-            logger.info("state was %s" % self.state)
+            old_pos = self.position
+            old_cal = self.state.calories
             t = Direction._RELATIVE_COORDINATES[dir]
             self.position += Coordinate(t[0], t[1])
             self.state = mr.myState
-            logger.info("position is %s" % self.position)
-            logger.info("state is %s" % self.state)
+            logger.info("position %s to %s. calories %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
 
     def moveTo(self, coords):
         logger.info("Will move to %s" % coords)
         for d in MAP_MANAGER.getDirections(self.position, coords):
             self.move(d)
             
+    def growIfWise(self):
+        while self.state.growCost < 0.2 * self.state.calories:
+            logger.info("Growing!")
+            gs = self.grow()
+            if gs.succeeded:
+                self.state = gs.myState
+                logger.info("New state agter GROW: %s" % self.state)
+            else:
+                break
+            logger.info("GROW: %s" % gs.message)
+            
+
     def run(self):
         logger.info("Dino %s starting..." % self.name)
         # init
@@ -123,29 +139,38 @@ class Dino(Dinosaur.Client, threading.Thread):
         # Real algo here...
 
         while True:
-            # Should I grow?
-            while self.state.growCost < 0.3 * self.state.calories:
-                logger.info("Growing!")
-                gs = self.grow()
-                if gs.succeeded:
-                    self.state = gs.myState
-                    logger.info("New state agter GROW: %s" % self.state)
-                else:
-                    break
-                logger.info("GROW: %s" % gs.message)
+            self.growIfWise()
             # Looking around
             for direction in (0, 2, 4, 6):
                 logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
                 lr = self.look(direction)
                 if lr.succeeded and len(lr.thingsSeen) != 0:
+                    self.state = lr.myState
                     for s in lr.thingsSeen:
                         MAP_MANAGER.addSighting(s, self.position)
-                logger.debug(MAP_MANAGER.sightings)
-                a = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                logger.info("Found closest %s" % a)
-                if a is not None:
+                for s in MAP_MANAGER.sightings:
+                    logger.debug(s)
+                candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+                if candidates is not None and len(candidates) > 0:
+                    candidates.reverse()
+                else:
+                    logger.warning("No candidates found. Moving on...")
+                    continue
+                while candidates is not None and len(candidates) > 0:
+                    a = candidates.pop()
+                    logger.info("Found closest %s" % a)
+                    if a.size > self.state.size + 2:
+                        logger.info("Seems big! Discarding")
+                        continue
                     self.moveTo(a.coordinate)
-                    
+                    self.growIfWise()
+                    # lay if wise...
+                    candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+                    if candidates is not None and len(candidates) > 0:
+                        candidates.reverse()
+                    else:
+                        logger.warning("No candidates found. Moving on...")
+                        break
 
 
 if __name__ == "__main__":
