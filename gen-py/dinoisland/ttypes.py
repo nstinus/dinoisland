@@ -392,6 +392,12 @@ class Sighting:
   def __ne__(self, other):
     return not (self == other)
 
+  def __cmp__(self, other):
+    t = cmp(self.type, other.type)
+    if t != 0:
+      return t
+    else:
+      return cmp(self.size, other.size)
 
 class RegisterClientResults:
   """
