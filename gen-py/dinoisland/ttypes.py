@@ -188,7 +188,7 @@ class Coordinate:
   def distance(self, other = None):
     r = self.row - (other is not None and other.row or 0)
     c = self.column - (other is not None and other.column or 0)
-    return sqrt(r**2 + c**2)
+    return max(abs(r), abs(c))
 
 class DinosaurState:
   """

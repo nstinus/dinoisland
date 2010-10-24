@@ -42,21 +42,40 @@ class MapManager:
         return None
 
     def getDirections(self, position, coords):
+        msg = "From %s to %s. " % (position, coords)
         cc = coords - position
         ret = list()
-        while cc.row > 0:
-            ret.append(Direction.S)
-            cc.row -= 1
-        while cc.row < 0:
-            ret.append(Direction.N)
-            cc.row += 1
-        while cc.column > 0:
-            ret.append(Direction.E)
-            cc.column -= 1
-        while cc.column < 0:
-            ret.append(Direction.W)
-            cc.column += 1
-        logger.info("From %s to %s. Directions: %s" % (position, coords, [Direction._VALUES_TO_NAMES[i] for i in ret]))
+        while cc.distance() != 0:
+            while cc.row > 0 and cc.column == 0:
+                ret.append(Direction.S)
+                cc.row -= 1
+            while cc.row < 0 and cc.column == 0:
+                ret.append(Direction.N)
+                cc.row += 1
+            while cc.column > 0 and cc.row == 0:
+                ret.append(Direction.E)
+                cc.column -= 1
+            while cc.column < 0 and cc.row == 0:
+                ret.append(Direction.W)
+                cc.column += 1
+            while cc.column > 0 and cc.row > 0:
+                ret.append(Direction.SE)
+                cc.row -= 1
+                cc.column -= 1
+            while cc.column < 0 and cc.row > 0:
+                ret.append(Direction.SW)
+                cc.row -= 1
+                cc.column += 1
+            while cc.column < 0 and cc.row < 0:
+                ret.append(Direction.NW)
+                cc.row += 1
+                cc.column += 1
+            while cc.column > 0 and cc.row < 0:
+                ret.append(Direction.NE)
+                cc.row += 1
+                cc.column -= 1
+ 
+        logger.info(msg + "Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in ret])
         return ret
         
 MAP_MANAGER = MapManager()
