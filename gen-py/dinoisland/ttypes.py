@@ -4,6 +4,8 @@
 # DO NOT EDIT UNLESS YOU ARE SURE THAT YOU KNOW WHAT YOU ARE DOING
 #
 
+from math import sqrt
+
 from thrift.Thrift import *
 
 from thrift.transport import TTransport
@@ -81,6 +83,15 @@ class Direction:
     "NW": 7,
   }
 
+  _RELATIVE_COORDINATES = {N:  (-1,  0),
+                           NE: (-1,  1),
+                           E:  ( 0,  1),
+                           SE: ( 1,  1),
+                           S:  ( 1,  0),
+                           SW: ( 1, -1),
+                           W:  ( 0, -1),
+                           NW: (-1, -1)}
+
 
 class Coordinate:
   """
@@ -157,6 +168,27 @@ class Coordinate:
 
   def __ne__(self, other):
     return not (self == other)
+
+  def __add__(self, other):
+    self.row += other.row
+    self.column += other.column
+    return self
+
+  def __sub__(self, other):
+    self.row -= other.row
+    self.column -= other.row
+    return self
+
+  def toRelative(self, position):
+    return self - position
+
+  def toAbsolute(self, position):
+    return self + position
+  
+  def distance(self, other = None):
+    r = self.row - (other is not None and other.row or 0)
+    c = self.column - (other is not None and other.column or 0)
+    return sqrt(r**2 + c**2)
 
 class DinosaurState:
   """
@@ -319,6 +351,14 @@ class Sighting:
     self.species = species
     self.size = size
 
+  def alterCoordsToAbsolute(self, position):
+    self.coodinate.toAbsolute(position)
+    return self
+
+  def alterCoordsToRelative(self, position):
+    self.coordinate.toRelative(position)
+    return self
+
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
       fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
@@ -397,7 +437,7 @@ class Sighting:
     if t != 0:
       return t
     else:
-      return cmp(self.size, other.size)
+      return cmp(self.coordinate.distance(), other.coordinate.distance())
 
 class RegisterClientResults:
   """
