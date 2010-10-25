@@ -38,49 +38,51 @@ class MapManager:
         self.sightings.append(sighting)
 
     def findClosest(self, position, type):
+        """ Returns the list of closest elements reachable from my current position. Returned positions are absolute. """
         # logger.debug("Sightings: %s" % self.sightings)
         self.sightings = [i for i in self.sightings if i.coordinate != position]
-        # logger.debug("Sightings: %s" % self.sightings)
+        logger.debug("Sightings:")
+        for s in self.sightings:
+            logger.debug(s)
         l = sorted([deepcopy(i).alterCoordsToRelative(position) for i in self.sightings if i.type == type])
+        l = [deepcopy(i).alterCoordsToAbsolute(position) for i in l]
         if len(l) > 0:
             return l
         return None
 
-    def getDirections(self, position, coords):
-        msg = "From %s to %s. " % (position, coords)
-        cc = coords - position
+    def getDirections(self, c):
         ret = list()
-        while cc.distance() != 0:
-            while cc.row > 0 and cc.column == 0:
+        while c.distance() != 0:
+            while c.row > 0 and c.column == 0:
                 ret.append(Direction.S)
-                cc.row -= 1
-            while cc.row < 0 and cc.column == 0:
+                c.row -= 1
+            while c.row < 0 and c.column == 0:
                 ret.append(Direction.N)
-                cc.row += 1
-            while cc.column > 0 and cc.row == 0:
+                c.row += 1
+            while c.column > 0 and c.row == 0:
                 ret.append(Direction.E)
-                cc.column -= 1
-            while cc.column < 0 and cc.row == 0:
+                c.column -= 1
+            while c.column < 0 and c.row == 0:
                 ret.append(Direction.W)
-                cc.column += 1
-            while cc.column > 0 and cc.row > 0:
+                c.column += 1
+            while c.column > 0 and c.row > 0:
                 ret.append(Direction.SE)
-                cc.row -= 1
-                cc.column -= 1
-            while cc.column < 0 and cc.row > 0:
+                c.row -= 1
+                c.column -= 1
+            while c.column < 0 and c.row > 0:
                 ret.append(Direction.SW)
-                cc.row -= 1
-                cc.column += 1
-            while cc.column < 0 and cc.row < 0:
+                c.row -= 1
+                c.column += 1
+            while c.column < 0 and c.row < 0:
                 ret.append(Direction.NW)
-                cc.row += 1
-                cc.column += 1
-            while cc.column > 0 and cc.row < 0:
+                c.row += 1
+                c.column += 1
+            while c.column > 0 and c.row < 0:
                 ret.append(Direction.NE)
-                cc.row += 1
-                cc.column -= 1
+                c.row += 1
+                c.column -= 1
  
-        logger.info(msg + "Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in ret])
+        logger.info("Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in ret])
         return ret
         
 MAP_MANAGER = MapManager()
@@ -99,20 +101,24 @@ class Dino(Dinosaur.Client, threading.Thread):
         mr = Dinosaur.Client.move(self, dir)
         logger.info(mr.message)
         if mr.succeeded:
-            old_pos = self.position
-            old_cal = self.state.calories
+            logger.info("I moved! Updating infos")
             t = Direction._RELATIVE_COORDINATES[dir]
             self.position += Coordinate(t[0], t[1])
             self.state = mr.myState
-            logger.info("position %s to %s. calories %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
+        else:
+            logger.warning("Move failed!")
+            
 
     def moveTo(self, coords):
         logger.info("Will move to %s" % coords)
-        for d in MAP_MANAGER.getDirections(self.position, coords):
+        old_pos = deepcopy(self.position)
+        old_cal = self.state.calories
+        for d in MAP_MANAGER.getDirections(coords - self.position):
             self.move(d)
+        logger.info("Moved from %s to %s. Calories gained %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
             
     def growIfWise(self):
-        while self.state.growCost < 0.2 * self.state.calories:
+        while self.state.growCost < 0.3 * self.state.calories:
             logger.info("Growing!")
             gs = self.grow()
             if gs.succeeded:
@@ -157,6 +163,9 @@ class Dino(Dinosaur.Client, threading.Thread):
                     logger.warning("No candidates found. Moving on...")
                     continue
                 while candidates is not None and len(candidates) > 0:
+                    logger.debug("Closest elements found:")
+                    for c in sorted(candidates[-4:], reverse=True):
+                        logger.debug(c)
                     a = candidates.pop()
                     logger.info("Found closest %s" % a)
                     if a.size > self.state.size + 2:
@@ -171,6 +180,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                     else:
                         logger.warning("No candidates found. Moving on...")
                         break
+                    
 
 
 if __name__ == "__main__":

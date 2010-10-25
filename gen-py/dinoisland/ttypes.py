@@ -176,7 +176,7 @@ class Coordinate:
 
   def __sub__(self, other):
     self.row -= other.row
-    self.column -= other.row
+    self.column -= other.column
     return self
 
   def toRelative(self, position):
@@ -352,7 +352,7 @@ class Sighting:
     self.size = size
 
   def alterCoordsToAbsolute(self, position):
-    self.coodinate.toAbsolute(position)
+    self.coordinate.toAbsolute(position)
     return self
 
   def alterCoordsToRelative(self, position):
