@@ -3,6 +3,7 @@ path.append("/usr/lib/python2.6/site-packages")
 
 import threading
 from copy import deepcopy
+from time import sleep
 
 from dinoisland import Dinosaur
 from dinoisland.ttypes import EntityType, Direction, Coordinate
@@ -230,6 +231,15 @@ if __name__ == "__main__":
 
     for d in DINO_POOL:
         d.start()
+
+    while threading.active_count() != 0:
+        while len(EGG_POOL) != 0:
+            logger.info("Found egg to wake up!")
+            e = EGG_POOL.pop()
+            d = Dino(e[0], Coordinate(e[2], e[1]))
+            DINO_POOL.append(d)
+            d.start()
+        sleep(1)
 
     for d in DINO_POOL:
         d.join()
