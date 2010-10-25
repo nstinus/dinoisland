@@ -23,7 +23,7 @@ THRIFT_PORT = 9033
 EMAIL = "xzoiid@gmail.com"
 SCORE_NAME = "xzoiid"
 ENTITY = EntityType.HERBIVORE
-OFFSPRING_DONATION = 1000
+OFFSPRING_DONATION = 1500
 
 EGG_POOL = set()
 DINO_POOL = list()
@@ -160,8 +160,8 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.logger.info("GROW: %s" % gs.message)
 
     def layIfWise(self):
-        if self.state.size > 10 \
-               and (self.state.eggCost + 1.2*OFFSPRING_DONATION) < 0.3 * self.state.calories:
+        if self.state.size > 5 \
+               and (self.state.eggCost + 1.2*OFFSPRING_DONATION + (5+1)*self.state.moveCost) < 0.5 * self.state.calories:
             self.logger.info("Laying offspring!")
             direction = choice([0, 2, 4, 6])
             er = self.egg(direction, OFFSPRING_DONATION)
@@ -172,6 +172,11 @@ class Dino(Dinosaur.Client, threading.Thread):
                 rc = Direction._RELATIVE_COORDINATES[direction]
                 p = self.position + Coordinate(rc[1], rc[0])
                 EGG_POOL.add((er.eggID, p.column, p.row))
+                new_dir = choice(list(set([0, 2, 4, 6]) - set([direction,])))
+                # Stupidly go away...
+                for i in range(5):
+                    self.move(new_dir)
+                self.look(new_dir)
             self.logger.info("LAY: %s" % er.message)
 
     def showReport(self):
