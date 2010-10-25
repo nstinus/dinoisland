@@ -176,7 +176,8 @@ class Dino(Dinosaur.Client, threading.Thread):
         if self.eggID is None:
             self.logger.info("I am the first egg. Registering.")
             rcr = self.registerClient(EMAIL, SCORE_NAME, ENTITY)
-            self.logger.info(rcr.message)
+            for l in rcr.message.split("*"):
+                self.logger.info("MESSAGE: %s" % l)
             self.species = rcr.species
             self.eggID = rcr.eggID
             self.logger.info("Got an eggID: %s" % self.eggID)
