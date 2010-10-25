@@ -133,14 +133,12 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.logger.info("Moved from %s to %s. Calories gained %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
             
     def growIfWise(self):
-        while self.state.growCost < 0.3 * self.state.calories:
+        if self.state.growCost < 0.3 * self.state.calories:
             self.logger.info("Growing!")
             gs = self.grow()
             if gs.succeeded:
                 self.state = gs.myState
                 self.logger.info("New state: %s" % self.state)
-            else:
-                break
             self.logger.info("GROW: %s" % gs.message)
 
     def run(self):
