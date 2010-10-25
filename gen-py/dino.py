@@ -96,7 +96,6 @@ class MapManager:
                 c.row += 1
                 c.column -= 1
  
-        self.logger.info("Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in ret])
         return ret
         
 MAP_MANAGER = MapManager()
@@ -136,7 +135,9 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.logger.info("Will move to %s" % coords)
         old_pos = deepcopy(self.position)
         old_cal = self.state.calories
-        for d in MAP_MANAGER.getDirections(coords - self.position):
+        directions = MAP_MANAGER.getDirections(coords - self.position)
+        self.logger.info("Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in directions])
+        for d in directions:
             self.move(d)
         self.logger.info("Moved from %s to %s. Calories gained %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
             
