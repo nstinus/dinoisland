@@ -163,28 +163,28 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.growIfWise()
             # Looking around
             for direction in (0, 2, 4, 6):
-                logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
+                self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
                 lr = self.look(direction)
                 if lr.succeeded and len(lr.thingsSeen) != 0:
                     self.state = lr.myState
                     for s in lr.thingsSeen:
                         MAP_MANAGER.addSighting(s, self.position)
                 for s in MAP_MANAGER.sightings:
-                    logger.debug(s)
+                    self.logger.debug(s)
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
                     candidates.reverse()
                 else:
-                    logger.warning("No candidates found. Moving on...")
+                    self.logger.warning("No candidates found. Moving on...")
                     continue
                 while candidates is not None and len(candidates) > 0:
-                    logger.debug("Closest elements found:")
+                    self.logger.debug("Closest elements found:")
                     for c in sorted(candidates[-4:], reverse=True):
-                        logger.debug(c)
+                        self.logger.debug(c)
                     a = candidates.pop()
-                    logger.info("Found closest %s" % a)
+                    self.logger.info("Found closest %s" % a)
                     if a.size > self.state.size + 2:
-                        logger.info("Seems big! Discarding")
+                        self.logger.info("Seems big! Discarding")
                         continue
                     self.moveTo(a.coordinate)
                     self.growIfWise()
@@ -193,7 +193,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                     if candidates is not None and len(candidates) > 0:
                         candidates.reverse()
                     else:
-                        logger.warning("No candidates found. Moving on...")
+                        self.logger.warning("No candidates found. Moving on...")
                         break
                     
 
