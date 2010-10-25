@@ -36,6 +36,7 @@ DINO_COUNTER = counter(0)
 class MapManager:
     def __init__(self):
         self.sightings = list()
+        self.lock = threading.Lock()
         self.logger = logging.getLogger("Map")
         self.logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
@@ -46,12 +47,16 @@ class MapManager:
 
     def addSighting(self, sighting, position):
         sighting.coordinate = sighting.coordinate.toAbsolute(position)
+        self.lock.acquire()
         self.sightings.append(sighting)
+        self.lock.release()
 
     def findClosest(self, position, type):
         """ Returns the list of closest elements reachable from my current position. Returned positions are absolute. """
+        self.lock.acquire()
         self.sightings = [i for i in self.sightings if i.coordinate != position]
         l = sorted([deepcopy(i).alterCoordsToRelative(position) for i in self.sightings if i.type == type])
+        self.lock.release()
         l = [deepcopy(i).alterCoordsToAbsolute(position) for i in l]
         if len(l) > 0:
             return l
