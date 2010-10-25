@@ -209,7 +209,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                     self.logger.info("Seems big! Discarding")
                     continue
                 self.moveTo(a.coordinate)
-                # self.layIfWise()
+                self.layIfWise()
                 self.growIfWise()
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
