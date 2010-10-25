@@ -128,8 +128,13 @@ class Dino(Dinosaur.Client, threading.Thread):
             t = Direction._RELATIVE_COORDINATES[dir]
             self.position += Coordinate(t[0], t[1])
             self.state = mr.myState
+            return True
         else:
             self.logger.warning("Move failed!")
+            direction = choice(list(set(Direction._VALUES_TO_NAMES.keys()) - set([dir,])))
+            self.move(direction)
+            self.look(direction)
+            return False
             
 
     def moveTo(self, coords):
@@ -139,8 +144,11 @@ class Dino(Dinosaur.Client, threading.Thread):
         directions = MAP_MANAGER.getDirections(coords - self.position)
         self.logger.info("Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in directions])
         for d in directions:
-            self.move(d)
+            if not self.move(d):
+                break
+        success = self.state.calories - old_cal > 0
         self.logger.info("Moved from %s to %s. Calories gained %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
+        return success
             
     def growIfWise(self):
         if self.state.growCost < 0.3 * self.state.calories:
