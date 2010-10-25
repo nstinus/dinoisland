@@ -12,14 +12,7 @@ from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 
 import logging
 
-
-logger = logging.getLogger("main")
-logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+LOG_FORMAT = "%(asctime)s - %(name)7s - %(levelname)7s - %(message)s"
 
 
 EMAIL = "xzoiid@gmail.com"
@@ -32,6 +25,13 @@ DINO_POOL = list()
 class MapManager:
     def __init__(self):
         self.sightings = list()
+        self.logger = logging.getLogger("Map")
+        self.logger.setLevel(logging.DEBUG)
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(LOG_FORMAT)
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
 
     def addSighting(self, sighting, position):
         sighting.coordinate = sighting.coordinate.toAbsolute(position)
@@ -39,11 +39,10 @@ class MapManager:
 
     def findClosest(self, position, type):
         """ Returns the list of closest elements reachable from my current position. Returned positions are absolute. """
-        # logger.debug("Sightings: %s" % self.sightings)
         self.sightings = [i for i in self.sightings if i.coordinate != position]
-        logger.debug("Sightings:")
+        self.logger.debug("Sightings:")
         for s in self.sightings:
-            logger.debug(s)
+            self.logger.debug(s)
         l = sorted([deepcopy(i).alterCoordsToRelative(position) for i in self.sightings if i.type == type])
         l = [deepcopy(i).alterCoordsToAbsolute(position) for i in l]
         if len(l) > 0:
@@ -82,7 +81,7 @@ class MapManager:
                 c.row += 1
                 c.column -= 1
  
-        logger.info("Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in ret])
+        self.logger.info("Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in ret])
         return ret
         
 MAP_MANAGER = MapManager()
@@ -92,55 +91,60 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.eggID = eggID
         name = eggID is None and "Mama" or eggID
         self.position = coords
-        logger.info("New Dino. eggID=%s, name=%s, position=%s" % (self.eggID, name, str(self.position)))
+        self.logger = logging.getLogger("Dino %s" % name)
+        self.logger.setLevel(logging.DEBUG)
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(LOG_FORMAT)
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+        self.logger.info("New Dino. eggID=%s, name=%s, position=%s" % (self.eggID, name, str(self.position)))
         Dinosaur.Client.__init__(self, protocol)
         threading.Thread.__init__(self, name=name)
 
     def move(self, dir):
-        logger.info("Try move to: %s" % Direction._VALUES_TO_NAMES[dir])
+        self.logger.info("Try move to: %s" % Direction._VALUES_TO_NAMES[dir])
         mr = Dinosaur.Client.move(self, dir)
-        logger.info(mr.message)
+        self.logger.info(mr.message)
         if mr.succeeded:
-            logger.info("I moved! Updating infos")
+            self.logger.info("I moved! Updating infos")
             t = Direction._RELATIVE_COORDINATES[dir]
             self.position += Coordinate(t[0], t[1])
             self.state = mr.myState
         else:
-            logger.warning("Move failed!")
+            self.logger.warning("Move failed!")
             
 
     def moveTo(self, coords):
-        logger.info("Will move to %s" % coords)
+        self.logger.info("Will move to %s" % coords)
         old_pos = deepcopy(self.position)
         old_cal = self.state.calories
         for d in MAP_MANAGER.getDirections(coords - self.position):
             self.move(d)
-        logger.info("Moved from %s to %s. Calories gained %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
+        self.logger.info("Moved from %s to %s. Calories gained %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
             
     def growIfWise(self):
         while self.state.growCost < 0.3 * self.state.calories:
-            logger.info("Growing!")
+            self.logger.info("Growing!")
             gs = self.grow()
             if gs.succeeded:
                 self.state = gs.myState
-                logger.info("New state agter GROW: %s" % self.state)
+                self.logger.info("New state: %s" % self.state)
             else:
                 break
-            logger.info("GROW: %s" % gs.message)
-            
+            self.logger.info("GROW: %s" % gs.message)
 
     def run(self):
-        logger.info("Dino %s starting..." % self.name)
-        # init
+        self.logger.info("Dino %s starting..." % self.name)
         if self.eggID is None:
-            logger.info("I am the first egg. Registering.")
+            self.logger.info("I am the first egg. Registering.")
             rcr = self.registerClient(EMAIL, SCORE_NAME, ENTITY)
-            logger.info(rcr.message)
+            self.logger.info(rcr.message)
             self.species = rcr.species
             self.eggID = rcr.eggID
-            logger.info("Got an eggID: %s" % self.eggID)
+            self.logger.info("Got an eggID: %s" % self.eggID)
         self.state = self.hatch(self.eggID)
-        logger.info("Got a state: %s" % self.state)
+        self.logger.info("Got a state: %s" % self.state)
 
         # Real algo here...
 
@@ -184,6 +188,14 @@ class Dino(Dinosaur.Client, threading.Thread):
 
 
 if __name__ == "__main__":
+    logger = logging.getLogger("main")
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(LOG_FORMAT)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
     transport = TSocket("thriftpuzzle.facebook.com", 9033)
     protocol = TBinaryProtocol(transport)
     
