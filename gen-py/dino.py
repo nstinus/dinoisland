@@ -14,6 +14,8 @@ import logging
 
 LOG_FORMAT = "%(asctime)s - %(name)7s - %(levelname)7s - %(message)s"
 
+THRIFT_SERVER = "thriftpuzzle.facebook.com"
+THRIFT_PORT = 9033
 
 EMAIL = "xzoiid@gmail.com"
 SCORE_NAME = "xzoiid"
@@ -87,10 +89,12 @@ class MapManager:
 MAP_MANAGER = MapManager()
 
 class Dino(Dinosaur.Client, threading.Thread):
-    def __init__(self, protocol, eggID=None, coords = Coordinate(0, 0)):
+    def __init__(self, eggID=None, coords = Coordinate(0, 0)):
         self.eggID = eggID
         name = eggID is None and "Mama" or eggID
         self.position = coords
+        self.transport = TSocket(THRIFT_SERVER, THRIFT_PORT)
+        self.protocol = TBinaryProtocol(self.transport)
         self.logger = logging.getLogger("Dino %s" % name)
         self.logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
@@ -99,7 +103,7 @@ class Dino(Dinosaur.Client, threading.Thread):
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
         self.logger.info("New Dino. eggID=%s, name=%s, position=%s" % (self.eggID, name, str(self.position)))
-        Dinosaur.Client.__init__(self, protocol)
+        Dinosaur.Client.__init__(self, self.protocol)
         threading.Thread.__init__(self, name=name)
 
     def move(self, dir):
@@ -136,6 +140,8 @@ class Dino(Dinosaur.Client, threading.Thread):
 
     def run(self):
         self.logger.info("Dino %s starting..." % self.name)
+        self.transport.open()
+        self.logger.info("Transport open.")
         if self.eggID is None:
             self.logger.info("I am the first egg. Registering.")
             rcr = self.registerClient(EMAIL, SCORE_NAME, ENTITY)
@@ -196,13 +202,7 @@ if __name__ == "__main__":
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    transport = TSocket("thriftpuzzle.facebook.com", 9033)
-    protocol = TBinaryProtocol(transport)
-    
-    DINO_POOL.append(Dino(protocol))
-
-    transport.open()
-    logger.info("Transport open")
+    DINO_POOL.append(Dino())
 
     for d in DINO_POOL:
         d.start()
