@@ -50,9 +50,6 @@ class MapManager:
     def findClosest(self, position, type):
         """ Returns the list of closest elements reachable from my current position. Returned positions are absolute. """
         self.sightings = [i for i in self.sightings if i.coordinate != position]
-        self.logger.debug("Sightings:")
-        for s in self.sightings:
-            self.logger.debug(s)
         l = sorted([deepcopy(i).alterCoordsToRelative(position) for i in self.sightings if i.type == type])
         l = [deepcopy(i).alterCoordsToAbsolute(position) for i in l]
         if len(l) > 0:
@@ -217,13 +214,3 @@ if __name__ == "__main__":
 
     for d in DINO_POOL:
         d.join()
-
-#     for i in range(10):
-#         rcr = client.registerClient("xzoiid@gmail.com", "xzoiid", EntityType.HERBIVORE)
-#         print rcr
-#    AVAILABLE_EGGS.append(rcr.eggID)
-  
-    
-#    ds = client.hatch(rcr.eggID)
-#    print ds
-
