@@ -250,7 +250,7 @@ if __name__ == "__main__":
     for d in DINO_POOL:
         d.start()
 
-    while threading.active_count() != 0:
+    while threading.active_count() > 1:
         while len(EGG_POOL) != 0:
             logger.info("Found egg to wake up!")
             e = EGG_POOL.pop()
