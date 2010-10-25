@@ -24,6 +24,14 @@ ENTITY = EntityType.HERBIVORE
 EGG_POOL = set()
 DINO_POOL = list()
 
+def counter(init):
+    i = init
+    while True:
+        i += 1
+        yield i
+
+DINO_COUNTER = counter(0)
+
 class MapManager:
     def __init__(self):
         self.sightings = list()
@@ -91,7 +99,7 @@ MAP_MANAGER = MapManager()
 class Dino(Dinosaur.Client, threading.Thread):
     def __init__(self, eggID=None, coords = Coordinate(0, 0)):
         self.eggID = eggID
-        name = eggID is None and "Mama" or eggID
+        name = eggID is None and str(0) or str(DINO_COUNTER.next())
         self.position = coords
         self.transport = TSocket(THRIFT_SERVER, THRIFT_PORT)
         self.protocol = TBinaryProtocol(self.transport)
