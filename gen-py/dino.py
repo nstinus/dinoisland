@@ -8,6 +8,7 @@ from random import choice
 
 from dinoisland import Dinosaur
 from dinoisland.ttypes import EntityType, Direction, Coordinate
+from dinoisland.ttypes import GameOverException, YouAreDeadException, BadEggException
 
 from thrift.transport.TSocket import TSocket
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
@@ -165,6 +166,9 @@ class Dino(Dinosaur.Client, threading.Thread):
                 EGG_POOL.add((er.eggID, p.column, p.row))
             self.logger.info("LAY: %s" % er.message)
 
+    def showReport(self):
+        self.logger.info("size=%d, calories=%d" % (self.state.size, self.state.calories))
+
     def run(self):
         self.logger.info("Dino %s starting..." % self.name)
         self.transport.open()
@@ -181,42 +185,55 @@ class Dino(Dinosaur.Client, threading.Thread):
 
         # Real algo here...
 
-        while True:
-            self.growIfWise()
-            # Looking around
-            direction = choice([0, 2, 4, 6])
-            self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
-            lr = self.look(direction)
-            if lr.succeeded and len(lr.thingsSeen) != 0:
-                self.state = lr.myState
-                for s in lr.thingsSeen:
-                    MAP_MANAGER.addSighting(s, self.position)
-            for s in MAP_MANAGER.sightings:
-                self.logger.debug(s)
-            candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-            if candidates is not None and len(candidates) > 0:
-                candidates.reverse()
-            else:
-                self.logger.warning("No candidates found. Moving on...")
-                continue
-            while candidates is not None and len(candidates) > 0:
-                self.logger.debug("Closest elements found:")
-                for c in sorted(candidates[-4:], reverse=True):
-                    self.logger.debug(c)
-                a = candidates.pop()
-                self.logger.info("Found closest %s" % a)
-                if a.size > self.state.size + 2:
-                    self.logger.info("Seems big! Discarding")
-                    continue
-                self.moveTo(a.coordinate)
-                self.layIfWise()
+        try:
+            while True:
                 self.growIfWise()
+                # Looking around
+                direction = choice([0, 2, 4, 6])
+                self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
+                lr = self.look(direction)
+                if lr.succeeded and len(lr.thingsSeen) != 0:
+                    self.state = lr.myState
+                    for s in lr.thingsSeen:
+                        MAP_MANAGER.addSighting(s, self.position)
+                for s in MAP_MANAGER.sightings:
+                    self.logger.debug(s)
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
                     candidates.reverse()
                 else:
                     self.logger.warning("No candidates found. Moving on...")
-                    break
+                    continue
+                while candidates is not None and len(candidates) > 0:
+                    self.logger.debug("Closest elements found:")
+                    for c in sorted(candidates[-4:], reverse=True):
+                        self.logger.debug(c)
+                    a = candidates.pop()
+                    self.logger.info("Found closest %s" % a)
+                    if a.size > self.state.size + 2:
+                        self.logger.info("Seems big! Discarding")
+                        continue
+                    self.moveTo(a.coordinate)
+                    self.layIfWise()
+                    self.growIfWise()
+                    candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+                    if candidates is not None and len(candidates) > 0:
+                        candidates.reverse()
+                    else:
+                        self.logger.warning("No candidates found. Moving on...")
+                        break
+        except GameOverException, e:
+            self.logger.error("GameOver! won=%s, score=%d" % (e.wonGame, e.score))
+            self.logger.info("HighScoreTable:")
+            for l in e.highScoreTable.splitlines():
+                self.logger.info(l)
+        except YouAreDeadException, e:
+            self.logger.warning("I'm dead! %s" % e.description)
+        except Exception, e:
+            self.logger.error("An unheld exception occured!")
+            raise(e)
+        finally:
+            self.showReport()
 
 
 if __name__ == "__main__":
