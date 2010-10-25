@@ -4,6 +4,7 @@ path.append("/usr/lib/python2.6/site-packages")
 import threading
 from copy import deepcopy
 from time import sleep
+from random import choice
 
 from dinoisland import Dinosaur
 from dinoisland.ttypes import EntityType, Direction, Coordinate
@@ -182,40 +183,39 @@ class Dino(Dinosaur.Client, threading.Thread):
         while True:
             self.growIfWise()
             # Looking around
-            for direction in (0, 2, 4, 6):
-                self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
-                lr = self.look(direction)
-                if lr.succeeded and len(lr.thingsSeen) != 0:
-                    self.state = lr.myState
-                    for s in lr.thingsSeen:
-                        MAP_MANAGER.addSighting(s, self.position)
-                for s in MAP_MANAGER.sightings:
-                    self.logger.debug(s)
+            direction = choice([0, 2, 4, 6])
+            self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
+            lr = self.look(direction)
+            if lr.succeeded and len(lr.thingsSeen) != 0:
+                self.state = lr.myState
+                for s in lr.thingsSeen:
+                    MAP_MANAGER.addSighting(s, self.position)
+            for s in MAP_MANAGER.sightings:
+                self.logger.debug(s)
+            candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+            if candidates is not None and len(candidates) > 0:
+                candidates.reverse()
+            else:
+                self.logger.warning("No candidates found. Moving on...")
+                continue
+            while candidates is not None and len(candidates) > 0:
+                self.logger.debug("Closest elements found:")
+                for c in sorted(candidates[-4:], reverse=True):
+                    self.logger.debug(c)
+                a = candidates.pop()
+                self.logger.info("Found closest %s" % a)
+                if a.size > self.state.size + 2:
+                    self.logger.info("Seems big! Discarding")
+                    continue
+                self.moveTo(a.coordinate)
+                # self.layIfWise()
+                self.growIfWise()
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
                     candidates.reverse()
                 else:
                     self.logger.warning("No candidates found. Moving on...")
-                    continue
-                while candidates is not None and len(candidates) > 0:
-                    self.logger.debug("Closest elements found:")
-                    for c in sorted(candidates[-4:], reverse=True):
-                        self.logger.debug(c)
-                    a = candidates.pop()
-                    self.logger.info("Found closest %s" % a)
-                    if a.size > self.state.size + 2:
-                        self.logger.info("Seems big! Discarding")
-                        continue
-                    self.moveTo(a.coordinate)
-                    self.growIfWise()
-                    # lay if wise...
-                    candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                    if candidates is not None and len(candidates) > 0:
-                        candidates.reverse()
-                    else:
-                        self.logger.warning("No candidates found. Moving on...")
-                        break
-                    
+                    break
 
 
 if __name__ == "__main__":
