@@ -26,6 +26,7 @@ EMAIL = "xzoiid@gmail.com"
 SCORE_NAME = "xzoiid"
 ENTITY = EntityType.HERBIVORE
 OFFSPRING_DONATION = 1500
+END_SCORE, BEST_SCORE = -1, -1
 
 EGG_POOL = set()
 DINO_POOL = list()
@@ -277,10 +278,13 @@ class Dino(Dinosaur.Client, threading.Thread):
                         self.logger.warning("No candidates found. Moving on...")
                         break
         except GameOverException, e:
+            global END_SCORE, BEST_SCORE
             self.logger.error("GameOver! won=%s, score=%d" % (e.wonGame, e.score))
             self.logger.info("HighScoreTable:")
             for l in e.highScoreTable.splitlines():
                 self.logger.info(l)
+            END_SCORE = e.score
+            BEST_SCORE = [int(l.split()[-1]) for l in e.highScoreTable.splitlines() if SCORE_NAME in l][0]
         except YouAreDeadException, e:
             self.logger.warning("I'm dead! %s" % e.description)
         except Exception, e:
@@ -317,3 +321,11 @@ if __name__ == "__main__":
 
     for d in DINO_POOL:
         d.join()
+
+    logger.info("All dinos appear to be dead.")
+    msg = "END: score=%d, best=%d" % (END_SCORE, BEST_SCORE)
+    logger.info(msg)
+    print msg
+
+    sleep(1)
+    exit(0)
