@@ -51,9 +51,9 @@ class MapManager:
         self.sightings = list()
         self.lock = threading.Lock()
         self.logger = logging.getLogger("Map")
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(LOG_LEVEL)
         ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
+        ch.setLevel(LOG_LEVEL)
         formatter = logging.Formatter(LOG_FORMAT)
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
@@ -109,7 +109,6 @@ class MapManager:
  
         return ret
         
-MAP_MANAGER = MapManager()
 
 class Dino(Dinosaur.Client, threading.Thread):
     def __init__(self, eggID=None, coords = Coordinate(0, 0)):
@@ -119,9 +118,9 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.transport = TSocket(THRIFT_SERVER, THRIFT_PORT)
         self.protocol = TBinaryProtocol(self.transport)
         self.logger = logging.getLogger("Dino %s" % name)
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(LOG_LEVEL)
         ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
+        ch.setLevel(LOG_LEVEL)
         formatter = logging.Formatter(LOG_FORMAT)
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
@@ -295,15 +294,32 @@ class Dino(Dinosaur.Client, threading.Thread):
 
 
 if __name__ == "__main__":
+    from optparse import OptionParser
+    parser = OptionParser(version=gitDescribe())
+    parser.add_option("--server", default=None, dest="server")
+    parser.add_option("--offspring_donation", type="int", dest="offspring_donation", default=-1)
+    parser.add_option("--debug", action="store_true", default=False, dest="debug")
+    (options, args) = parser.parse_args()
+
+    LOG_LEVEL = options.debug and logging.DEBUG or logging.INFO
+
     logger = logging.getLogger("main")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(LOG_LEVEL)
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(LOG_LEVEL)
     formatter = logging.Formatter(LOG_FORMAT)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
     logger.info("dino %s starting at %s" % (gitDescribe(), NOW))
+
+    if options.server is not None:
+        THRIFT_SERVER, THRIFT_PORT = options.server.split(':')
+        THRIFT_PORT = int(THRIFT_PORT)
+    if options.offspring_donation != -1:
+        OFFSPRING_DONATION = options.offspring_donation
+
+    MAP_MANAGER = MapManager()
 
     DINO_POOL.append(Dino())
 
