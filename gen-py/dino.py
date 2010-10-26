@@ -5,6 +5,8 @@ import threading
 from copy import deepcopy
 from time import sleep
 from random import choice
+from commands import getstatusoutput
+from datetime import datetime
 
 from dinoisland import Dinosaur
 from dinoisland.ttypes import EntityType, Direction, Coordinate
@@ -27,6 +29,7 @@ OFFSPRING_DONATION = 1500
 
 EGG_POOL = set()
 DINO_POOL = list()
+NOW = datetime.today()
 
 def counter(init):
     i = init
@@ -35,6 +38,12 @@ def counter(init):
         yield i
 
 DINO_COUNTER = counter(0)
+
+
+def gitDescribe():
+    r = getstatusoutput("git describe --tags")
+    return r[0] == 0 and r[1] or None
+
 
 class MapManager:
     def __init__(self):
@@ -289,6 +298,8 @@ if __name__ == "__main__":
     formatter = logging.Formatter(LOG_FORMAT)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+
+    logger.info("dino %s starting at %s" % (gitDescribe(), NOW))
 
     DINO_POOL.append(Dino())
 
