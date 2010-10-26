@@ -151,6 +151,8 @@ class MapManager:
         self.lock.release()
         l = [deepcopy(i).alterCoordsToAbsolute(position) for i in l]
         if len(l) > 0:
+            for i in l:
+                self.logger.debug("Closest elements: %s" % i)
             return l
         return None
         
@@ -218,7 +220,7 @@ class Dino(Dinosaur.Client, threading.Thread):
     def moveTo(self, coords):
         old_pos = deepcopy(self.position)
         old_cal = self.state.calories
-        directions = vectorToDirections(coords - self.position)
+        directions = vectorToDirections(deepcopy(coords) - self.position)
         self.logger.info("Will move to %s. Directions: %s" % (coords,
                                                               [Direction._VALUES_TO_NAMES[i] for i in directions]))
         moves = list()
@@ -324,12 +326,13 @@ class Dino(Dinosaur.Client, threading.Thread):
                     continue
                 while candidates is not None and len(candidates) > 0:
                     a = candidates.pop(0)
-                    self.logger.info("Found closest %s" % a)
+                    self.logger.info("FOUND closest at %d, species='%s', size=%d" % (a.coordinate.distance(self.position),
+                                                                                     a.species,
+                                                                                     a.size))
                     if a.size > self.state.size + 2:
                         self.logger.info("Seems big! Discarding")
                         continue
                     if not self.moveTo(a.coordinate):
-                        self.logger.warning("Fund nothing there!")
                         self.look(choice(range(8)))
                     elif self.counters['moves'] % 10 == 0:
                         self.logger.info("Random look")
@@ -355,7 +358,7 @@ class Dino(Dinosaur.Client, threading.Thread):
             BEST_SCORE = [int(l.split()[-1]) for l in e.highScoreTable.splitlines() if SCORE_NAME in l][0]
         except YouAreDeadException, e:
             self.logger.debug(e)
-            self.logger.warning("I'm dead! %s" % e.description)
+            self.logger.warning("DEAD: %s" % e.description)
         except Exception, e:
             self.logger.debug(e)
             self.logger.error("An unheld exception occured!")
