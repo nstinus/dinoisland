@@ -92,6 +92,10 @@ def vectorToDirections(c):
 def getCone(direction):
     return set([range(8)[direction-1], direction, range(8)[(direction+1)%8]])
 
+def minmax(l):
+    return min(l), max(l)
+
+
 class MapManager:
     def __init__(self):
         self.sightings = list()
@@ -176,11 +180,15 @@ class Dino(Dinosaur.Client, threading.Thread):
         if lr.succeeded:
             self.state = lr.myState
         if lr.succeeded and len(lr.thingsSeen) != 0:
-                farest = max([i.coordinate.distance(self.position) for i in lr.thingsSeen])
-                MAP_MANAGER.addSightings(self.position, direction, farest, lr.thingsSeen)
-                self.logger.info("LOOK OK: %d things seen. Farest at %d." % (len(lr.thingsSeen), farest))
+            MAP_MANAGER.addSightings(self.position, direction, farest, lr.thingsSeen)
+            distances = [i.coordinate.distance(self.position) for i in lr.thingsSeen]
+            closest, farest = minmax(distances)
+            self.logger.info("LOOK OK (%s): %d things seen. Closest/Farest %d/%d," % (Direction._VALUES_TO_NAMES[direction],
+                                                                                      len(lr.thingsSeen),
+                                                                                      closest,
+                                                                                      farest))
         else:
-            self.logger.warning("LOOK KO: seen nothing.")
+            self.logger.warning("LOOK KO (%s): seen nothing." % Direction._VALUES_TO_NAMES[dir])
         return lr.succeeded
 
     def move(self, dir):
