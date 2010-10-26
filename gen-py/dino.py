@@ -89,6 +89,8 @@ def vectorToDirections(c):
 
     return ret
 
+def getCone(direction):
+    return set([range(8)[direction-1], direction, range(8)[(direction+1)%8]])
 
 class MapManager:
     def __init__(self):
@@ -102,27 +104,37 @@ class MapManager:
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
 
-    def addSighting(self, sighting, position):
+    def __addSighting(self, sighting, position):
         sighting.coordinate = sighting.coordinate.toAbsolute(position)
-        self.lock.acquire()
         self.sightings.append(sighting)
-        self.lock.release()
 
-    def deleteSightings(self, position, direction, distance):
-        cone = set([range(8)[direction-1], direction, range(8)[(direction+1)%8]])
-        self.lock.acquire()
+    def __deleteSightings(self, position, direction, distance):
         old_n = len(self.sightings)
-        self.sightings = [i for i in self.sightings if i.coordinate.distance(position) > distance \
-                 or vectorToOrientation(i.coordinate - position) not in cone]
+        if len(self.sightings) != 0:
+            self.sightings = [i for i in self.sightings if i.coordinate.distance(position) > distance \
+                                  or vectorToOrientation(i.coordinate - position) not in getCone(direction)]
         new_n = len(self.sightings)
-        self.lock.release()
-        msg = "deleteSightings(pos=%s, dir=%s, d=%d), deleted %d / %d (was %d) sightings"
+        msg = "DELETE pos=%s, dir=%s, d=%d: deleted %d/%d (is %d now) sightings"
         self.logger.info(msg % (position,
                                 Direction._VALUES_TO_NAMES[direction],
                                 distance,
                                 old_n - new_n,
-                                new_n,
-                                old_n))
+                                old_n,
+                                new_n))
+
+    def addSightings(self, position, direction, distance, sightings):
+        self.lock.acquire()
+        self.__deleteSightings(position, direction, distance)
+        old_n = len(self.sightings)
+        for s in sightings:
+            self.__addSighting(s, position)
+        new_n = len(self.sightings)
+        self.lock.release()
+        msg = "ADD pos=%s: added %d/%d (is %d now) sightings"
+        self.logger.info(msg % (position,
+                                new_n - old_n,
+                                old_n,
+                                new_n))
 
     def findClosest(self, position, type):
         """ Returns the list of closest elements reachable from my current position. Returned positions are absolute. """
@@ -161,15 +173,14 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.counters['calories_burnt'] += self.state.lookCost
         lr = Dinosaur.Client.look(self, direction)
         self.logger.debug(lr)
-        if lr.succeeded and len(lr.thingsSeen) != 0:
-            farest = max([i.coordinate.distance(self.position) for i in lr.thingsSeen])
-            MAP_MANAGER.deleteSightings(self.position, direction, farest)
+        if lr.succeeded:
             self.state = lr.myState
-            for s in lr.thingsSeen:
-                MAP_MANAGER.addSighting(s, self.position)
-            logger.info("LOOK: %d things seen. Farest at %d" % (len(lr.thingsSeen), farest))
-            # for s in MAP_MANAGER.sightings:
-            #    self.logger.debug(s)
+        if lr.succeeded and len(lr.thingsSeen) != 0:
+                farest = max([i.coordinate.distance(self.position) for i in lr.thingsSeen])
+                MAP_MANAGER.addSightings(self.position, direction, farest, lr.thingsSeen)
+                self.logger.info("LOOK OK: %d things seen. Farest at %d." % (len(lr.thingsSeen), farest))
+        else:
+            self.logger.warning("LOOK KO: seen nothing.")
         return lr.succeeded
 
     def move(self, dir):
