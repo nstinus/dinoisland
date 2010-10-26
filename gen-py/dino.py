@@ -46,6 +46,9 @@ def gitDescribe():
     return r[0] == 0 and r[1] or None
 
 
+def getCone(direction):
+    return set([range(8)[direction-1], direction, range(8)[(direction+1)%8]])
+
 class MapManager:
     def __init__(self):
         self.sightings = list()
@@ -260,11 +263,14 @@ class Dino(Dinosaur.Client, threading.Thread):
             while True:
                 self.growIfWise()
                 # Looking around
-                direction = choice([0, 2, 4, 6])
+                direction = choice(range(8))
                 self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
                 self.look(direction)
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
+                    if candidates[0].coordinate.distance(self.position)*self.state.eggCost > 0.5*self.state.calories:
+                        self.look(choice(list(set(range(8)) - getCone(direction))))
+                        candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     candidates.reverse()
                 else:
                     self.logger.warning("No candidates found. Moving on...")
@@ -288,6 +294,9 @@ class Dino(Dinosaur.Client, threading.Thread):
                     self.growIfWise()
                     candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     if candidates is not None and len(candidates) > 0:
+                        if candidates[0].coordinate.distance(self.position)*self.state.eggCost > 0.5*self.state.calories:
+                            self.look(choice(list(set(range(8)) - getCone(direction))))
+                            candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                         candidates.reverse()
                     else:
                         self.logger.warning("No candidates found. Moving on...")
