@@ -184,12 +184,11 @@ class Dino(Dinosaur.Client, threading.Thread):
         return lr.succeeded
 
     def move(self, dir):
-        self.logger.info("Try move to: %s" % Direction._VALUES_TO_NAMES[dir])
         mr = Dinosaur.Client.move(self, dir)
         self.logger.debug(mr)
-        self.logger.info(mr.message)
         if mr.succeeded:
-            self.logger.info("I moved! Updating infos")
+            self.logger.info("MOVE OK: %s. %s" % (Direction._VALUES_TO_NAMES[dir],
+                                                  mr.message))
             t = Direction._RELATIVE_COORDINATES[dir]
             self.position += Coordinate(t[0], t[1])
             self.state = mr.myState
@@ -198,7 +197,8 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.counters['calories_burnt'] += self.state.moveCost
             return True
         else:
-            self.logger.warning("Move failed!")
+            self.logger.warning("MOVE KO: %s. %s" % (Direction._VALUES_TO_NAMES[dir],
+                                                     mr.message))
             direction = choice(list(set(Direction._VALUES_TO_NAMES.keys()) - set([dir,])))
             self.move(direction)
             self.look(direction)
@@ -224,15 +224,17 @@ class Dino(Dinosaur.Client, threading.Thread):
             
     def growIfWise(self):
         if self.state.growCost < 0.3 * self.state.calories:
-            self.logger.info("Growing!")
             gs = self.grow()
             self.logger.debug(gs)
+            msg = "GROW %%s: %s" % gs.message
             if gs.succeeded:
                 self.state = gs.myState
                 self.counters['actions'] += 1
                 self.counters['calories_burnt'] += self.state.growCost
-                self.logger.info("New state: %s" % self.state)
-            self.logger.info("GROW: %s" % gs.message)
+                self.logger.info(msg % "OK")
+            else:
+                self.logger.warning(msg % "KO")
+        self.logger.info("STATE: %s" % self.state)
 
     def layIfWise(self):
         expected_calories_cost  = self.state.eggCost + 1.2*OFFSPRING_DONATION + 5*self.state.moveCost + self.state.lookCost
@@ -243,7 +245,7 @@ class Dino(Dinosaur.Client, threading.Thread):
             if er.succeeded:
                 self.logger.info("Successfully layed an egg!")
                 self.state = er.parentDinoState
-                self.logger.info("New State: %s" % self.state)
+                self.logger.info("STATE: %s" % self.state)
                 rc = Direction._RELATIVE_COORDINATES[direction]
                 p = self.position + Coordinate(rc[1], rc[0])
                 EGG_POOL.add((er.eggID, p.column, p.row))
@@ -283,7 +285,7 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.eggID = rcr.eggID
             self.logger.info("Got an eggID: %s" % self.eggID)
         self.state = self.hatch(self.eggID)
-        self.logger.info("Got a state: %s" % self.state)
+        self.logger.info("STATE: %s" % self.state)
 
         # Real algo here...
 
@@ -301,9 +303,6 @@ class Dino(Dinosaur.Client, threading.Thread):
                     self.logger.warning("No candidates found. Moving on...")
                     continue
                 while candidates is not None and len(candidates) > 0:
-                    # self.logger.debug("Closest elements found:")
-                    # for c in sorted(candidates[-4:], reverse=True):
-                    #     self.logger.debug(c)
                     a = candidates.pop()
                     self.logger.info("Found closest %s" % a)
                     if a.size > self.state.size + 2:
