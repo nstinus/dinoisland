@@ -115,9 +115,16 @@ class Dino(Dinosaur.Client, threading.Thread):
         formatter = logging.Formatter(LOG_FORMAT)
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
+        self.counters = {'actions': 0, 'moves': 0, 'calories_found': 0, 'calories_burnt': 0, 'eggs': 0, 'looks': 0}
         self.logger.info("New Dino. eggID=%s, name=%s, position=%s" % (self.eggID, name, str(self.position)))
         Dinosaur.Client.__init__(self, self.protocol)
         threading.Thread.__init__(self, name=name)
+
+    def look(self, *args, **kw):
+        self.counters['actions'] += 1
+        self.counters['looks'] += 1
+        self.counters['calories_burnt'] += self.state.lookCost
+        return Dinosaur.Client.look(self, *args, **kw)
 
     def move(self, dir):
         self.logger.info("Try move to: %s" % Direction._VALUES_TO_NAMES[dir])
@@ -128,6 +135,9 @@ class Dino(Dinosaur.Client, threading.Thread):
             t = Direction._RELATIVE_COORDINATES[dir]
             self.position += Coordinate(t[0], t[1])
             self.state = mr.myState
+            self.counters['actions'] += 1
+            self.counters['moves'] += 1
+            self.counters['calories_burnt'] += self.state.moveCost
             return True
         else:
             self.logger.warning("Move failed!")
@@ -136,7 +146,6 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.look(direction)
             return False
             
-
     def moveTo(self, coords):
         self.logger.info("Will move to %s" % coords)
         old_pos = deepcopy(self.position)
@@ -146,9 +155,14 @@ class Dino(Dinosaur.Client, threading.Thread):
         for d in directions:
             if not self.move(d):
                 break
-        success = self.state.calories - old_cal > 0
-        self.logger.info("Moved from %s to %s. Calories gained %d (%d)" % (old_pos, self.position, self.state.calories - old_cal, self.state.calories))
-        return success
+        cal_found = (self.state.calories - old_cal) - (len(directions) * self.state.moveCost) # Bilan - Known losses
+        if cal_found > 0:
+            self.counters['calories_found'] += cal_found
+        self.logger.info("MOVE %s. %s -> %s. Calories gained %d." % (cal_found > 0 and "OK" or "KO",
+                                                                     old_pos,
+                                                                     self.position,
+                                                                     self.state.calories - old_cal))
+        return cal_found > 0
             
     def growIfWise(self):
         if self.state.growCost < 0.3 * self.state.calories:
@@ -156,12 +170,14 @@ class Dino(Dinosaur.Client, threading.Thread):
             gs = self.grow()
             if gs.succeeded:
                 self.state = gs.myState
+                self.counters['actions'] += 1
+                self.counters['calories_burnt'] += self.state.growCost
                 self.logger.info("New state: %s" % self.state)
             self.logger.info("GROW: %s" % gs.message)
 
     def layIfWise(self):
-        if self.state.size > 5 \
-               and (self.state.eggCost + 1.2*OFFSPRING_DONATION + (5+1)*self.state.moveCost) < 0.5 * self.state.calories:
+        expected_calories_cost  = self.state.eggCost + 1.2*OFFSPRING_DONATION + 5*self.state.moveCost + self.state.lookCost
+        if self.state.size > 5 and expected_calories_cost < 0.5 * self.state.calories:
             self.logger.info("Laying offspring!")
             direction = choice([0, 2, 4, 6])
             er = self.egg(direction, OFFSPRING_DONATION)
@@ -177,10 +193,22 @@ class Dino(Dinosaur.Client, threading.Thread):
                 for i in range(5):
                     self.move(new_dir)
                 self.look(new_dir)
+                self.counters['actions'] += 1
+                self.counters['eggs'] += 1
+                self.counters['calories_burnt'] += expected_calories_cost
             self.logger.info("LAY: %s" % er.message)
 
-    def showReport(self):
-        self.logger.info("size=%d, calories=%d" % (self.state.size, self.state.calories))
+    def showPMReport(self):
+        self.logger.info("POST MORTEM REPORT")
+        self.logger.info("              PMR: size=%d" % self.state.size)
+        self.logger.info("              PMR: calories=%d, burnt=%d, found=%d, ratio=%f" % (self.state.calories,
+                                                                                           self.counters['calories_burnt'],
+                                                                                           self.counters['calories_found'],
+                                                                                           self.counters['calories_found'] != 0 and self.counters['calories_burnt']/self.counters['calories_found'] or -1))
+        self.logger.info("              PMR: moves=%d, looks=%d, eggs=%d, actions=%d" % (self.counters['moves'],
+                                                                                         self.counters['looks'],
+                                                                                         self.counters['eggs'],
+                                                                                         self.counters['actions']))
 
     def run(self):
         self.logger.info("Dino %s starting..." % self.name)
@@ -247,7 +275,7 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.logger.error("An unheld exception occured!")
             raise(e)
         finally:
-            self.showReport()
+            self.showPMReport()
 
 
 if __name__ == "__main__":
