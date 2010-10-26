@@ -274,6 +274,8 @@ class Dino(Dinosaur.Client, threading.Thread):
                     self.moveTo(a.coordinate)
                     self.layIfWise()
                     self.growIfWise()
+                    if self.counters['moves'] % 10 == 0:
+                        self.look(choice(range(8)))
                     candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     if candidates is not None and len(candidates) > 0:
                         candidates.reverse()
