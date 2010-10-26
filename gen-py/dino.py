@@ -89,15 +89,17 @@ def vectorToDirections(c):
 
     return ret
 
-def getCone(direction):
-    return set([range(8)[direction-1], direction, range(8)[(direction+1)%8]])
+def getCone(direction, angle=1):
+    ret = set()
+    ret.add(direction)
+    for i in range(1, angle+1):
+        ret.add(range(8)[(direction-i)%8])
+        ret.add(range(8)[(direction+i)%8])
+    return ret
 
 def minmax(l):
     return min(l), max(l)
 
-
-def getCone(direction):
-    return set([range(8)[direction-1], direction, range(8)[(direction+1)%8]])
 
 class MapManager:
     def __init__(self):
