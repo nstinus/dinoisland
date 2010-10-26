@@ -96,6 +96,9 @@ def minmax(l):
     return min(l), max(l)
 
 
+def getCone(direction):
+    return set([range(8)[direction-1], direction, range(8)[(direction+1)%8]])
+
 class MapManager:
     def __init__(self):
         self.sightings = list()
@@ -213,22 +216,29 @@ class Dino(Dinosaur.Client, threading.Thread):
             return False
             
     def moveTo(self, coords):
-        self.logger.info("Will move to %s" % coords)
         old_pos = deepcopy(self.position)
         old_cal = self.state.calories
         directions = vectorToDirections(coords - self.position)
-        self.logger.info("Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in directions])
+        self.logger.info("Will move to %s. Directions: %s" % (coords,
+                                                              [Direction._VALUES_TO_NAMES[i] for i in directions]))
+        moves = list()
         for d in directions:
-            if not self.move(d):
-                break
+            moves.append(self.move(d))
+            moveto_successful = reduce(lambda x, y: x and y, moves)
+            if not moveto_successful: break
         cal_found = (self.state.calories - old_cal) - (len(directions) * self.state.moveCost) # Bilan - Known losses
+        msg = "MOVETO %%s. %s -> %s. Calories gained %d." % (old_pos,
+                                                             self.position,
+                                                             self.state.calories - old_cal)
         if cal_found > 0:
             self.counters['calories_found'] += cal_found
-        self.logger.info("MOVE %s. %s -> %s. Calories gained %d." % (cal_found > 0 and "OK" or "KO",
-                                                                     old_pos,
-                                                                     self.position,
-                                                                     self.state.calories - old_cal))
-        return cal_found > 0
+        if cal_found > 0 and moveto_successful:
+            self.logger.info(msg % "OK")
+        else:
+            self.logger.warning(msg % ("%s (m=%s, f=%s)" % ("KO",
+                                                           moveto_successful and "OK" or "KO",
+                                                           cal_found > 0 and "OK" or "KO"),))
+        return cal_found > 0 and moveto_successful
             
     def growIfWise(self):
         if self.state.growCost < 0.3 * self.state.calories:
@@ -301,11 +311,14 @@ class Dino(Dinosaur.Client, threading.Thread):
             while True:
                 self.growIfWise()
                 # Looking around
-                direction = choice([0, 2, 4, 6])
+                direction = choice(range(8))
                 self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
                 self.look(direction)
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
+                    if candidates[0].coordinate.distance(self.position)*self.state.eggCost > 0.5*self.state.calories:
+                        self.look(choice(list(set(range(8)) - getCone(direction))))
+                        candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     candidates.reverse()
                 else:
                     self.logger.warning("No candidates found. Moving on...")
@@ -316,11 +329,19 @@ class Dino(Dinosaur.Client, threading.Thread):
                     if a.size > self.state.size + 2:
                         self.logger.info("Seems big! Discarding")
                         continue
-                    self.moveTo(a.coordinate)
+                    if not self.moveTo(a.coordinate):
+                        self.logger.warning("Fund nothing there!")
+                        self.look(choice(range(8)))
+                    elif self.counters['moves'] % 10 == 0:
+                        self.logger.info("Random look")
+                        self.look(choice(range(8)))
                     self.layIfWise()
                     self.growIfWise()
                     candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     if candidates is not None and len(candidates) > 0:
+                        if candidates[0].coordinate.distance(self.position)*self.state.eggCost > 0.5*self.state.calories:
+                            self.look(choice(list(set(range(8)) - getCone(direction))))
+                            candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                         candidates.reverse()
                     else:
                         self.logger.warning("No candidates found. Moving on...")
