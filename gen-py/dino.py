@@ -183,15 +183,15 @@ class Dino(Dinosaur.Client, threading.Thread):
         if lr.succeeded:
             self.state = lr.myState
         if lr.succeeded and len(lr.thingsSeen) != 0:
-            MAP_MANAGER.addSightings(self.position, direction, farest, lr.thingsSeen)
             distances = [i.coordinate.distance(self.position) for i in lr.thingsSeen]
             closest, farest = minmax(distances)
+            MAP_MANAGER.addSightings(self.position, direction, farest, lr.thingsSeen)
             self.logger.info("LOOK OK (%s): %d things seen. Closest/Farest %d/%d," % (Direction._VALUES_TO_NAMES[direction],
                                                                                       len(lr.thingsSeen),
                                                                                       closest,
                                                                                       farest))
         else:
-            self.logger.warning("LOOK KO (%s): seen nothing." % Direction._VALUES_TO_NAMES[dir])
+            self.logger.warning("LOOK KO (%s): seen nothing." % Direction._VALUES_TO_NAMES[direction])
         return lr.succeeded
 
     def move(self, dir):
