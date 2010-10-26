@@ -40,10 +40,54 @@ def counter(init):
 
 DINO_COUNTER = counter(0)
 
-
 def gitDescribe():
     r = getstatusoutput("git describe --tags")
     return r[0] == 0 and r[1] or None
+
+def vectorToOrientation(c):
+    """ Returns the general direction of a vector."""
+    if c.row > 0 and c.column == 0: return Direction.S
+    if c.row < 0 and c.column == 0: return Direction.N
+    if c.column > 0 and c.row == 0: return Direction.E
+    if c.column < 0 and c.row == 0: return Direction.W
+    if c.column > 0 and c.row > 0: return Direction.SE
+    if c.column < 0 and c.row > 0: return Direction.SW
+    if c.column < 0 and c.row < 0: return Direction.NW
+    if c.column > 0 and c.row < 0: return Direction.NE
+
+def vectorToDirections(c):
+    ret = list()
+    while c.distance() != 0:
+        while c.row > 0 and c.column == 0:
+            ret.append(Direction.S)
+            c.row -= 1
+        while c.row < 0 and c.column == 0:
+            ret.append(Direction.N)
+            c.row += 1
+        while c.column > 0 and c.row == 0:
+            ret.append(Direction.E)
+            c.column -= 1
+        while c.column < 0 and c.row == 0:
+            ret.append(Direction.W)
+            c.column += 1
+        while c.column > 0 and c.row > 0:
+            ret.append(Direction.SE)
+            c.row -= 1
+            c.column -= 1
+        while c.column < 0 and c.row > 0:
+            ret.append(Direction.SW)
+            c.row -= 1
+            c.column += 1
+        while c.column < 0 and c.row < 0:
+            ret.append(Direction.NW)
+            c.row += 1
+            c.column += 1
+        while c.column > 0 and c.row < 0:
+            ret.append(Direction.NE)
+            c.row += 1
+            c.column -= 1
+
+    return ret
 
 
 class MapManager:
@@ -64,6 +108,22 @@ class MapManager:
         self.sightings.append(sighting)
         self.lock.release()
 
+    def deleteSightings(self, position, direction, distance):
+        cone = set([range(8)[direction-1], direction, range(8)[(direction+1)%8]])
+        self.lock.acquire()
+        old_n = len(self.sightings)
+        self.sightings = [i for i in self.sightings if i.coordinate.distance(position) > distance \
+                 or vectorToOrientation(i.coordinate - position) not in cone]
+        new_n = len(self.sightings)
+        self.lock.release()
+        msg = "deleteSightings(pos=%s, dir=%s, d=%d), deleted %d / %d (was %d) sightings"
+        self.logger.info(msg % (position,
+                                Direction._VALUES_TO_NAMES[direction],
+                                distance,
+                                old_n - new_n,
+                                new_n,
+                                old_n))
+
     def findClosest(self, position, type):
         """ Returns the list of closest elements reachable from my current position. Returned positions are absolute. """
         self.lock.acquire()
@@ -74,40 +134,6 @@ class MapManager:
         if len(l) > 0:
             return l
         return None
-
-    def getDirections(self, c):
-        ret = list()
-        while c.distance() != 0:
-            while c.row > 0 and c.column == 0:
-                ret.append(Direction.S)
-                c.row -= 1
-            while c.row < 0 and c.column == 0:
-                ret.append(Direction.N)
-                c.row += 1
-            while c.column > 0 and c.row == 0:
-                ret.append(Direction.E)
-                c.column -= 1
-            while c.column < 0 and c.row == 0:
-                ret.append(Direction.W)
-                c.column += 1
-            while c.column > 0 and c.row > 0:
-                ret.append(Direction.SE)
-                c.row -= 1
-                c.column -= 1
-            while c.column < 0 and c.row > 0:
-                ret.append(Direction.SW)
-                c.row -= 1
-                c.column += 1
-            while c.column < 0 and c.row < 0:
-                ret.append(Direction.NW)
-                c.row += 1
-                c.column += 1
-            while c.column > 0 and c.row < 0:
-                ret.append(Direction.NE)
-                c.row += 1
-                c.column -= 1
- 
-        return ret
         
 
 class Dino(Dinosaur.Client, threading.Thread):
@@ -129,17 +155,18 @@ class Dino(Dinosaur.Client, threading.Thread):
         Dinosaur.Client.__init__(self, self.protocol)
         threading.Thread.__init__(self, name=name)
 
-    def look(self, *args, **kw):
+    def look(self, direction):
         self.counters['actions'] += 1
         self.counters['looks'] += 1
         self.counters['calories_burnt'] += self.state.lookCost
-        lr = Dinosaur.Client.look(self, *args, **kw)
+        lr = Dinosaur.Client.look(self, direction)
         self.logger.debug(lr)
         if lr.succeeded and len(lr.thingsSeen) != 0:
+            farest = max([i.coordinate.distance(self.position) for i in lr.thingsSeen])
+            MAP_MANAGER.deleteSightings(self.position, direction, farest)
             self.state = lr.myState
             for s in lr.thingsSeen:
                 MAP_MANAGER.addSighting(s, self.position)
-            farest = max([i.coordinate.distance(self.position) for i in lr.thingsSeen])
             logger.info("LOOK: %d things seen. Farest at %d" % (len(lr.thingsSeen), farest))
             # for s in MAP_MANAGER.sightings:
             #    self.logger.debug(s)
@@ -170,7 +197,7 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.logger.info("Will move to %s" % coords)
         old_pos = deepcopy(self.position)
         old_cal = self.state.calories
-        directions = MAP_MANAGER.getDirections(coords - self.position)
+        directions = vectorToDirections(coords - self.position)
         self.logger.info("Directions: %s" % [Direction._VALUES_TO_NAMES[i] for i in directions])
         for d in directions:
             if not self.move(d):
@@ -263,9 +290,9 @@ class Dino(Dinosaur.Client, threading.Thread):
                     self.logger.warning("No candidates found. Moving on...")
                     continue
                 while candidates is not None and len(candidates) > 0:
-                    self.logger.debug("Closest elements found:")
-                    for c in sorted(candidates[-4:], reverse=True):
-                        self.logger.debug(c)
+                    # self.logger.debug("Closest elements found:")
+                    # for c in sorted(candidates[-4:], reverse=True):
+                    #     self.logger.debug(c)
                     a = candidates.pop()
                     self.logger.info("Found closest %s" % a)
                     if a.size > self.state.size + 2:
