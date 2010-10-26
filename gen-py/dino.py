@@ -124,7 +124,16 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.counters['actions'] += 1
         self.counters['looks'] += 1
         self.counters['calories_burnt'] += self.state.lookCost
-        return Dinosaur.Client.look(self, *args, **kw)
+        lr = Dinosaur.Client.look(self, *args, **kw)
+        if lr.succeeded and len(lr.thingsSeen) != 0:
+            self.state = lr.myState
+            for s in lr.thingsSeen:
+                MAP_MANAGER.addSighting(s, self.position)
+            farest = max([i.coordinate.distance(self.position) for i in lr.thingsSeen])
+            logger.info("LOOK: %d things seen. Farest at %d" % (len(lr.thingsSeen), farest))
+            # for s in MAP_MANAGER.sightings:
+            #    self.logger.debug(s)
+        return lr.succeeded
 
     def move(self, dir):
         self.logger.info("Try move to: %s" % Direction._VALUES_TO_NAMES[dir])
@@ -233,13 +242,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                 # Looking around
                 direction = choice([0, 2, 4, 6])
                 self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
-                lr = self.look(direction)
-                if lr.succeeded and len(lr.thingsSeen) != 0:
-                    self.state = lr.myState
-                    for s in lr.thingsSeen:
-                        MAP_MANAGER.addSighting(s, self.position)
-                for s in MAP_MANAGER.sightings:
-                    self.logger.debug(s)
+                self.look(direction)
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
                     candidates.reverse()
