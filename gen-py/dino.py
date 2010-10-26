@@ -319,12 +319,11 @@ class Dino(Dinosaur.Client, threading.Thread):
                     if candidates[0].coordinate.distance(self.position)*self.state.eggCost > 0.5*self.state.calories:
                         self.look(choice(list(set(range(8)) - getCone(direction))))
                         candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                    candidates.reverse()
                 else:
                     self.logger.warning("No candidates found. Moving on...")
                     continue
                 while candidates is not None and len(candidates) > 0:
-                    a = candidates.pop()
+                    a = candidates.pop(0)
                     self.logger.info("Found closest %s" % a)
                     if a.size > self.state.size + 2:
                         self.logger.info("Seems big! Discarding")
@@ -342,7 +341,6 @@ class Dino(Dinosaur.Client, threading.Thread):
                         if candidates[0].coordinate.distance(self.position)*self.state.eggCost > 0.5*self.state.calories:
                             self.look(choice(list(set(range(8)) - getCone(direction))))
                             candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                        candidates.reverse()
                     else:
                         self.logger.warning("No candidates found. Moving on...")
                         break
