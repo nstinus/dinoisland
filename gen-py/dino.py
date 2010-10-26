@@ -134,6 +134,7 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.counters['looks'] += 1
         self.counters['calories_burnt'] += self.state.lookCost
         lr = Dinosaur.Client.look(self, *args, **kw)
+        self.logger.debug(lr)
         if lr.succeeded and len(lr.thingsSeen) != 0:
             self.state = lr.myState
             for s in lr.thingsSeen:
@@ -147,6 +148,7 @@ class Dino(Dinosaur.Client, threading.Thread):
     def move(self, dir):
         self.logger.info("Try move to: %s" % Direction._VALUES_TO_NAMES[dir])
         mr = Dinosaur.Client.move(self, dir)
+        self.logger.debug(mr)
         self.logger.info(mr.message)
         if mr.succeeded:
             self.logger.info("I moved! Updating infos")
@@ -186,6 +188,7 @@ class Dino(Dinosaur.Client, threading.Thread):
         if self.state.growCost < 0.3 * self.state.calories:
             self.logger.info("Growing!")
             gs = self.grow()
+            self.logger.debug(gs)
             if gs.succeeded:
                 self.state = gs.myState
                 self.counters['actions'] += 1
@@ -235,6 +238,7 @@ class Dino(Dinosaur.Client, threading.Thread):
         if self.eggID is None:
             self.logger.info("I am the first egg. Registering.")
             rcr = self.registerClient(EMAIL, SCORE_NAME, ENTITY)
+            self.logger.debug(rcr)
             for l in rcr.message.split("*"):
                 self.logger.info("MESSAGE: %s" % l)
             self.species = rcr.species
@@ -278,6 +282,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                         break
         except GameOverException, e:
             global END_SCORE, BEST_SCORE
+            self.logger.debug(e)
             self.logger.error("GameOver! won=%s, score=%d" % (e.wonGame, e.score))
             self.logger.info("HighScoreTable:")
             for l in e.highScoreTable.splitlines():
@@ -285,8 +290,10 @@ class Dino(Dinosaur.Client, threading.Thread):
             END_SCORE = e.score
             BEST_SCORE = [int(l.split()[-1]) for l in e.highScoreTable.splitlines() if SCORE_NAME in l][0]
         except YouAreDeadException, e:
+            self.logger.debug(e)
             self.logger.warning("I'm dead! %s" % e.description)
         except Exception, e:
+            self.logger.debug(e)
             self.logger.error("An unheld exception occured!")
             raise(e)
         finally:
