@@ -52,6 +52,8 @@ if __name__ == "__main__":
         for i in range(len(runs)):
             runs[i].parse()
         runs =[r for r in runs if r.score != -1]
+        if len(runs) == 0:
+            continue
         M = max(runs)
         N = len(runs)
         med = median([i.score for i in runs])
