@@ -40,7 +40,7 @@ def counter(init):
 
 DINO_COUNTER = counter(0)
 
-__raw_git_desc = getstatusoutput("git describe --tags --abbrev --dirty")
+__raw_git_desc = getstatusoutput("git describe --tags --long --abbrev=4 --dirty")
 GIT_DESCRIBE = __raw_git_desc[0] == 0 and __raw_git_desc[1] or None
 
 def vectorToOrientation(c):
