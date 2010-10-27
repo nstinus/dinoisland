@@ -319,8 +319,14 @@ class Dino(Dinosaur.Client, threading.Thread):
                 self.look(direction)
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
-                    if candidates[0].coordinate.distance(self.position)*self.state.moveCost > 0.5*self.state.calories:
+                    closest_dist = candidates[0].coordinate.distance(self.position)
+                    if closest_dist*self.state.moveCost > 0.5*self.state.calories:
                         self.look(choice(list(set(range(8)) - getCone(direction, 2))))
+                        candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+                    if closest_dist*self.state.moveCost > 0.75*self.state.calories and len(DINO_POOL) > 1:
+                        # try sleeping a little in the hope that somebody else wil find some shit...
+                        self.logger.warning("SLEEP: nothing seems close enough!")
+                        sleep(5)
                         candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 else:
                     self.logger.warning("No candidates found. Moving on...")
@@ -342,8 +348,14 @@ class Dino(Dinosaur.Client, threading.Thread):
                     self.growIfWise()
                     candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     if candidates is not None and len(candidates) > 0:
-                        if candidates[0].coordinate.distance(self.position)*self.state.moveCost > 0.5*self.state.calories:
+                        closest_dist = candidates[0].coordinate.distance(self.position)
+                        if closest_dist*self.state.moveCost > 0.5*self.state.calories:
                             self.look(choice(list(set(range(8)) - getCone(direction, 2))))
+                            candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+                        if closest_dist*self.state.moveCost > 0.75*self.state.calories and len(DINO_POOL) > 1:
+                            # try sleeping a little in the hope that somebody else wil find some shit...
+                            self.logger.warning("SLEEP: nothing seems close enough!")
+                            sleep(5)
                             candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     else:
                         self.logger.warning("No candidates found. Moving on...")
