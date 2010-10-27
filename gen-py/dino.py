@@ -40,9 +40,8 @@ def counter(init):
 
 DINO_COUNTER = counter(0)
 
-def gitDescribe():
-    r = getstatusoutput("git describe --tags --abbrev --dirty")
-    return r[0] == 0 and r[1] or None
+__raw_git_desc = getstatusoutput("git describe --tags --abbrev --dirty")
+GIT_DESCRIBE = __raw_git_desc[0] == 0 and __raw_git_desc[1] or None
 
 def vectorToOrientation(c):
     """ Returns the general direction of a vector."""
@@ -371,7 +370,7 @@ class Dino(Dinosaur.Client, threading.Thread):
 
 if __name__ == "__main__":
     from optparse import OptionParser
-    parser = OptionParser(version=gitDescribe())
+    parser = OptionParser(version=GIT_DESCRIBE)
     parser.add_option("--server", default=None, dest="server")
     parser.add_option("--offspring_donation", type="int", dest="offspring_donation", default=-1)
     parser.add_option("--debug", action="store_true", default=False, dest="debug")
@@ -387,7 +386,7 @@ if __name__ == "__main__":
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    logger.info("dino %s starting at %s" % (gitDescribe(), NOW))
+    logger.info("dino %s starting at %s" % (GIT_DESCRIBE, NOW))
 
     if options.server is not None:
         THRIFT_SERVER, THRIFT_PORT = options.server.split(':')
@@ -415,7 +414,7 @@ if __name__ == "__main__":
         d.join()
 
     logger.info("All dinos appear to be dead.")
-    msg = "END: score=%d, best=%d" % (END_SCORE, BEST_SCORE)
+    msg = "END: version=%s, score=%d, best=%d" % (GIT_DESCRIBE, END_SCORE, BEST_SCORE)
     logger.info(msg)
     print msg
 
