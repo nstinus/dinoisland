@@ -243,7 +243,8 @@ class Dino(Dinosaur.Client, threading.Thread):
         return cal_found > 0 and moveto_successful
             
     def growIfWise(self):
-        if self.state.growCost < 0.3 * self.state.calories:
+        if self.state.size < 2 \
+                or self.state.growCost < 0.3 * self.state.calories:
             gs = self.grow()
             self.logger.debug(gs)
             msg = "GROW %%s: %s" % gs.message
