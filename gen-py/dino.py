@@ -348,6 +348,9 @@ class Dino(Dinosaur.Client, threading.Thread):
                     else:
                         self.logger.warning("No candidates found. Moving on...")
                         break
+        except YouAreDeadException, e:
+            self.logger.debug(e)
+            self.logger.warning("DEAD: %s" % e.description)
         except GameOverException, e:
             global END_SCORE, BEST_SCORE
             self.logger.debug(e)
@@ -357,9 +360,6 @@ class Dino(Dinosaur.Client, threading.Thread):
                 self.logger.info(l)
             END_SCORE = e.score
             BEST_SCORE = [int(l.split()[-1]) for l in e.highScoreTable.splitlines() if SCORE_NAME in l][0]
-        except YouAreDeadException, e:
-            self.logger.debug(e)
-            self.logger.warning("DEAD: %s" % e.description)
         except Exception, e:
             self.logger.debug(e)
             self.logger.error("An unheld exception occured!")
