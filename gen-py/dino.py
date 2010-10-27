@@ -281,16 +281,15 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.logger.info("LAY: %s" % er.message)
 
     def showPMReport(self):
-        self.logger.info("POST MORTEM REPORT")
-        self.logger.info("              PMR: size=%d" % self.state.size)
-        self.logger.info("              PMR: calories=%d, burnt=%d, found=%d, ratio=%f" % (self.state.calories,
-                                                                                           self.counters['calories_burnt'],
-                                                                                           self.counters['calories_found'],
-                                                                                           self.counters['calories_found'] != 0 and self.counters['calories_burnt']/self.counters['calories_found'] or -1))
-        self.logger.info("              PMR: moves=%d, looks=%d, eggs=%d, actions=%d" % (self.counters['moves'],
-                                                                                         self.counters['looks'],
-                                                                                         self.counters['eggs'],
-                                                                                         self.counters['actions']))
+        self.logger.info("PMR: size=%d" % self.state.size)
+        self.logger.info("PMR: calories=%d, burnt=%d, found=%d, ratio=%f" % (self.state.calories,
+                                                                             self.counters['calories_burnt'],
+                                                                             self.counters['calories_found'],
+                                                                             self.counters['calories_found'] != 0 and self.counters['calories_burnt']/self.counters['calories_found'] or -1))
+        self.logger.info("PMR: moves=%d, looks=%d, eggs=%d, actions=%d" % (self.counters['moves'],
+                                                                           self.counters['looks'],
+                                                                           self.counters['eggs'],
+                                                                           self.counters['actions']))
 
     def run(self):
         self.logger.info("Dino %s starting..." % self.name)
