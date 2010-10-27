@@ -1,3 +1,7 @@
 #!/bin/bash -l
 
-python $(pwd)/gen-py/dino.py 2>&1 | tee /tmp/dino.$(git describe --tags).$(date +%s)
+GIT_COMMIT=$(git describe --tags --abbrev --dirty)
+BIN=$(pwd)/gen-py/dino.py
+LOG=/tmp/dino.${GIT_COMMIT}.$(date +%s)
+
+python $BIN 2>&1 | tee $LOG
