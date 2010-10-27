@@ -318,8 +318,8 @@ class Dino(Dinosaur.Client, threading.Thread):
                 self.look(direction)
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
-                    if candidates[0].coordinate.distance(self.position)*self.state.eggCost > 0.5*self.state.calories:
-                        self.look(choice(list(set(range(8)) - getCone(direction))))
+                    if candidates[0].coordinate.distance(self.position)*self.state.moveCost > 0.5*self.state.calories:
+                        self.look(choice(list(set(range(8)) - getCone(direction, 2))))
                         candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 else:
                     self.logger.warning("No candidates found. Moving on...")
@@ -341,8 +341,8 @@ class Dino(Dinosaur.Client, threading.Thread):
                     self.growIfWise()
                     candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     if candidates is not None and len(candidates) > 0:
-                        if candidates[0].coordinate.distance(self.position)*self.state.eggCost > 0.5*self.state.calories:
-                            self.look(choice(list(set(range(8)) - getCone(direction))))
+                        if candidates[0].coordinate.distance(self.position)*self.state.moveCost > 0.5*self.state.calories:
+                            self.look(choice(list(set(range(8)) - getCone(direction, 2))))
                             candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                     else:
                         self.logger.warning("No candidates found. Moving on...")
