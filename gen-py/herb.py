@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from sys import path
 path.append("/usr/lib/python2.6/site-packages")
 
@@ -40,7 +42,7 @@ def counter(init):
 
 DINO_COUNTER = counter(0)
 
-__raw_git_desc = getstatusoutput("git describe --tags --long --abbrev=4 --dirty")
+__raw_git_desc = getstatusoutput("git describe --tags --long --abbrev --dirty")
 GIT_DESCRIBE = __raw_git_desc[0] == 0 and __raw_git_desc[1] or None
 
 def vectorToOrientation(c):
@@ -156,7 +158,7 @@ class MapManager:
                 self.logger.debug("Closest elements: %s" % i)
             return l
         return None
-        
+
 
 class Dino(Dinosaur.Client, threading.Thread):
     def __init__(self, eggID=None, coords = Coordinate(0, 0)):
@@ -217,7 +219,7 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.move(direction)
             self.look(direction)
             return False
-            
+
     def moveTo(self, coords):
         old_pos = deepcopy(self.position)
         old_cal = self.state.calories
@@ -242,7 +244,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                                                            moveto_successful and "OK" or "KO",
                                                            cal_found > 0 and "OK" or "KO"),))
         return cal_found > 0 and moveto_successful
-            
+
     def growIfWise(self):
         if self.state.size < 2 \
                 or self.state.growCost < 0.3 * self.state.calories:
