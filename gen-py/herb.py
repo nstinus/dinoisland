@@ -264,7 +264,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                 closest_dist = candidates[0].coordinate.distance(self.position)
                 times_slept = 0
                 while closest_dist*self.state.moveCost > 0.75*self.state.calories \
-                        and times_slept < 10:
+                        and times_slept < 10 and threading.active_count > 2:
                     self.logger.warning("SLEEP: nothing seems close enough!")
                     sleep(5)
                     times_slept += 1
