@@ -20,8 +20,7 @@ from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 from dino.core import vectorToDirections, vectorToOrientation, minmax, getCone, counter
 
 import logging
-
-LOG_FORMAT = "%(asctime)s - %(name)7s - %(levelname)7s - %(message)s"
+LOG_FORMAT = "%(asctime)s  %(name)-10s  %(levelname)-8s  %(message)s"
 
 THRIFT_SERVER = "thriftpuzzle.facebook.com"
 THRIFT_PORT = 9033
@@ -46,12 +45,6 @@ class MapManager:
         self.sightings = list()
         self.lock = threading.Lock()
         self.logger = logging.getLogger("Map")
-        self.logger.setLevel(LOG_LEVEL)
-        ch = logging.StreamHandler()
-        ch.setLevel(LOG_LEVEL)
-        formatter = logging.Formatter(LOG_FORMAT)
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
 
     def __addSighting(self, sighting, position):
         sighting.coordinate = sighting.coordinate.toAbsolute(position)
@@ -109,13 +102,7 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.position = coords
         self.transport = TSocket(THRIFT_SERVER, THRIFT_PORT)
         self.protocol = TBinaryProtocol(self.transport)
-        self.logger = logging.getLogger("Dino %s" % name)
-        self.logger.setLevel(LOG_LEVEL)
-        ch = logging.StreamHandler()
-        ch.setLevel(LOG_LEVEL)
-        formatter = logging.Formatter(LOG_FORMAT)
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
+        self.logger = logging.getLogger("Herb_%s" % name)
         self.counters = {'actions': 0,
                          'moves': 0,
                          'calories_found': 0,
@@ -352,13 +339,16 @@ if __name__ == "__main__":
 
     LOG_LEVEL = options.debug and logging.DEBUG or logging.INFO
 
+    logging.basicConfig(level=LOG_LEVEL,
+                        format=LOG_FORMAT,
+                        filename="/tmp/herb.%s.%s.log" % (GIT_DESCRIBE, NOW.strftime("%Y%m%d_%H%M%S")),
+                        filemode="w")
+    console = logging.StreamHandler()
+    console.setLevel(logging.WARNING)
+    console.setFormatter(logging.Formatter(LOG_FORMAT))
+    logging.getLogger('').addHandler(console)
+
     logger = logging.getLogger("main")
-    logger.setLevel(LOG_LEVEL)
-    ch = logging.StreamHandler()
-    ch.setLevel(LOG_LEVEL)
-    formatter = logging.Formatter(LOG_FORMAT)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
 
     logger.info("dino %s starting at %s" % (GIT_DESCRIBE, NOW))
 
