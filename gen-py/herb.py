@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from sys import path
 path.append("/usr/lib/python2.6/site-packages")
 
@@ -14,6 +16,8 @@ from dinoisland.ttypes import GameOverException, YouAreDeadException, BadEggExce
 
 from thrift.transport.TSocket import TSocket
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
+
+from dino.core import vectorToDirections, vectorToOrientation, minmax, getCone, counter
 
 import logging
 
@@ -32,73 +36,10 @@ EGG_POOL = set()
 DINO_POOL = list()
 NOW = datetime.today()
 
-def counter(init):
-    i = init
-    while True:
-        i += 1
-        yield i
-
 DINO_COUNTER = counter(0)
 
-__raw_git_desc = getstatusoutput("git describe --tags --long --abbrev=4 --dirty")
+__raw_git_desc = getstatusoutput("git describe --tags --long --abbrev --dirty")
 GIT_DESCRIBE = __raw_git_desc[0] == 0 and __raw_git_desc[1] or None
-
-def vectorToOrientation(c):
-    """ Returns the general direction of a vector."""
-    if c.row > 0 and c.column == 0: return Direction.S
-    if c.row < 0 and c.column == 0: return Direction.N
-    if c.column > 0 and c.row == 0: return Direction.E
-    if c.column < 0 and c.row == 0: return Direction.W
-    if c.column > 0 and c.row > 0: return Direction.SE
-    if c.column < 0 and c.row > 0: return Direction.SW
-    if c.column < 0 and c.row < 0: return Direction.NW
-    if c.column > 0 and c.row < 0: return Direction.NE
-
-def vectorToDirections(c):
-    ret = list()
-    while c.distance() != 0:
-        while c.row > 0 and c.column == 0:
-            ret.append(Direction.S)
-            c.row -= 1
-        while c.row < 0 and c.column == 0:
-            ret.append(Direction.N)
-            c.row += 1
-        while c.column > 0 and c.row == 0:
-            ret.append(Direction.E)
-            c.column -= 1
-        while c.column < 0 and c.row == 0:
-            ret.append(Direction.W)
-            c.column += 1
-        while c.column > 0 and c.row > 0:
-            ret.append(Direction.SE)
-            c.row -= 1
-            c.column -= 1
-        while c.column < 0 and c.row > 0:
-            ret.append(Direction.SW)
-            c.row -= 1
-            c.column += 1
-        while c.column < 0 and c.row < 0:
-            ret.append(Direction.NW)
-            c.row += 1
-            c.column += 1
-        while c.column > 0 and c.row < 0:
-            ret.append(Direction.NE)
-            c.row += 1
-            c.column -= 1
-
-    return ret
-
-def getCone(direction, angle=1):
-    ret = set()
-    ret.add(direction)
-    for i in range(1, angle+1):
-        ret.add(range(8)[(direction-i)%8])
-        ret.add(range(8)[(direction+i)%8])
-    return ret
-
-def minmax(l):
-    return min(l), max(l)
-
 
 class MapManager:
     def __init__(self):
@@ -119,16 +60,19 @@ class MapManager:
     def __deleteSightings(self, position, direction, distance):
         old_n = len(self.sightings)
         if len(self.sightings) != 0:
-            self.sightings = [i for i in self.sightings if i.coordinate.distance(position) > distance \
-                                  or vectorToOrientation(i.coordinate - position) not in getCone(direction)]
+            self.sightings = [i for i in self.sightings \
+                              if i.coordinate.distance(position) > distance \
+                                  or vectorToOrientation(i.coordinate - position) \
+                                      not in getCone(direction)]
         new_n = len(self.sightings)
         msg = "DELETE pos=%s, dir=%s, d=%d: deleted %d/%d (is %d now) sightings"
-        self.logger.info(msg % (position,
-                                Direction._VALUES_TO_NAMES[direction],
-                                distance,
-                                old_n - new_n,
-                                old_n,
-                                new_n))
+        self.logger.info(msg \
+            % (position,
+               Direction._VALUES_TO_NAMES[direction],
+               distance,
+               old_n - new_n,
+               old_n,
+               new_n))
 
     def addSightings(self, position, direction, distance, sightings):
         self.lock.acquire()
@@ -139,16 +83,16 @@ class MapManager:
         new_n = len(self.sightings)
         self.lock.release()
         msg = "ADD pos=%s: added %d/%d (is %d now) sightings"
-        self.logger.info(msg % (position,
-                                new_n - old_n,
-                                old_n,
-                                new_n))
+        self.logger.info(msg \
+            % (position, new_n - old_n, old_n, new_n))
 
     def findClosest(self, position, type):
-        """ Returns the list of closest elements reachable from my current position. Returned positions are absolute. """
+        """ Returns the list of closest elements reachable from my current position.
+            Returned positions are absolute. """
         self.lock.acquire()
         self.sightings = [i for i in self.sightings if i.coordinate != position]
-        l = sorted([deepcopy(i).alterCoordsToRelative(position) for i in self.sightings if i.type == type])
+        l = sorted([deepcopy(i).alterCoordsToRelative(position) \
+                    for i in self.sightings if i.type == type])
         self.lock.release()
         l = [deepcopy(i).alterCoordsToAbsolute(position) for i in l]
         if len(l) > 0:
@@ -156,7 +100,7 @@ class MapManager:
                 self.logger.debug("Closest elements: %s" % i)
             return l
         return None
-        
+
 
 class Dino(Dinosaur.Client, threading.Thread):
     def __init__(self, eggID=None, coords = Coordinate(0, 0)):
@@ -172,37 +116,49 @@ class Dino(Dinosaur.Client, threading.Thread):
         formatter = logging.Formatter(LOG_FORMAT)
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
-        self.counters = {'actions': 0, 'moves': 0, 'calories_found': 0, 'calories_burnt': 0, 'eggs': 0, 'looks': 0}
-        self.logger.info("New Dino. eggID=%s, name=%s, position=%s" % (self.eggID, name, str(self.position)))
+        self.counters = {'actions': 0,
+                         'moves': 0,
+                         'calories_found': 0,
+                         'calories_burnt': 0,
+                         'eggs': 0,
+                         'looks': 0}
+        self.logger.info("New Dino. eggID=%s, name=%s, position=%s" \
+            % (self.eggID, name, str(self.position)))
         Dinosaur.Client.__init__(self, self.protocol)
         threading.Thread.__init__(self, name=name)
 
+    def stat(self):
+        return "@%s, cal=%d, size=%d" % (self.position, self.state.calories, self.state.size)
+
     def look(self, direction):
-        self.counters['actions'] += 1
-        self.counters['looks'] += 1
-        self.counters['calories_burnt'] += self.state.lookCost
+        self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
         lr = Dinosaur.Client.look(self, direction)
         self.logger.debug(lr)
         if lr.succeeded:
+            self.counters['actions'] += 1
+            self.counters['looks'] += 1
+            self.counters['calories_burnt'] += self.state.lookCost
             self.state = lr.myState
         if lr.succeeded and len(lr.thingsSeen) != 0:
             distances = [i.coordinate.distance(self.position) for i in lr.thingsSeen]
             closest, farest = minmax(distances)
             MAP_MANAGER.addSightings(self.position, direction, farest, lr.thingsSeen)
-            self.logger.info("LOOK OK (%s): %d things seen. Closest/Farest %d/%d," % (Direction._VALUES_TO_NAMES[direction],
-                                                                                      len(lr.thingsSeen),
-                                                                                      closest,
-                                                                                      farest))
+            self.logger.info("LOOK OK (%s): %d things seen. Closest/Farest %d/%d," \
+                % (Direction._VALUES_TO_NAMES[direction],
+                   len(lr.thingsSeen),
+                   closest,
+                   farest))
         else:
-            self.logger.warning("LOOK KO (%s): seen nothing." % Direction._VALUES_TO_NAMES[direction])
+            self.logger.warning("LOOK KO (%s): seen nothing." \
+                % Direction._VALUES_TO_NAMES[direction])
         return lr.succeeded
 
     def move(self, dir):
         mr = Dinosaur.Client.move(self, dir)
         self.logger.debug(mr)
         if mr.succeeded:
-            self.logger.info("MOVE OK: %s. %s" % (Direction._VALUES_TO_NAMES[dir],
-                                                  mr.message))
+            self.logger.info("MOVE OK: %s. %s" \
+                % (Direction._VALUES_TO_NAMES[dir], mr.message))
             t = Direction._RELATIVE_COORDINATES[dir]
             self.position += Coordinate(t[0], t[1])
             self.state = mr.myState
@@ -211,38 +167,36 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.counters['calories_burnt'] += self.state.moveCost
             return True
         else:
-            self.logger.warning("MOVE KO: %s. %s" % (Direction._VALUES_TO_NAMES[dir],
-                                                     mr.message))
+            self.logger.warning("MOVE KO: %s. %s" \
+                % (Direction._VALUES_TO_NAMES[dir], mr.message))
             direction = choice(list(set(Direction._VALUES_TO_NAMES.keys()) - set([dir,])))
             self.move(direction)
             self.look(direction)
             return False
-            
+
     def moveTo(self, coords):
         old_pos = deepcopy(self.position)
         old_cal = self.state.calories
         directions = vectorToDirections(deepcopy(coords) - self.position)
-        self.logger.info("Will move to %s. Directions: %s" % (coords,
-                                                              [Direction._VALUES_TO_NAMES[i] for i in directions]))
+        self.logger.info("Will move to %s. Directions: %s" \
+            % (coords, [Direction._VALUES_TO_NAMES[i] for i in directions]))
         moves = list()
         for d in directions:
             moves.append(self.move(d))
             moveto_successful = reduce(lambda x, y: x and y, moves)
             if not moveto_successful: break
         cal_found = (self.state.calories - old_cal) - (len(directions) * self.state.moveCost) # Bilan - Known losses
-        msg = "MOVETO %%s. %s -> %s. Calories gained %d." % (old_pos,
-                                                             self.position,
-                                                             self.state.calories - old_cal)
+        msg = "MOVETO %%s. %s -> %s. Calories gained %d." \
+            % (old_pos, self.position, self.state.calories - old_cal)
         if cal_found > 0:
             self.counters['calories_found'] += cal_found
         if cal_found > 0 and moveto_successful:
             self.logger.info(msg % "OK")
         else:
-            self.logger.warning(msg % ("%s (m=%s, f=%s)" % ("KO",
-                                                           moveto_successful and "OK" or "KO",
-                                                           cal_found > 0 and "OK" or "KO"),))
+            self.logger.warning(msg % ("%s (m=%s, f=%s)" \
+                % ("KO", moveto_successful and "OK" or "KO", cal_found > 0 and "OK" or "KO"),))
         return cal_found > 0 and moveto_successful
-            
+
     def growIfWise(self):
         if self.state.size < 2 \
                 or self.state.growCost < 0.3 * self.state.calories:
@@ -256,18 +210,22 @@ class Dino(Dinosaur.Client, threading.Thread):
                 self.logger.info(msg % "OK")
             else:
                 self.logger.warning(msg % "KO")
-        self.logger.info("STATE: %s" % self.state)
+        self.logger.info("STATE: %s" % self.stat())
 
     def layIfWise(self):
-        expected_calories_cost  = self.state.eggCost + 1.2*OFFSPRING_DONATION + 5*self.state.moveCost + self.state.lookCost
-        if self.state.size > 5 and expected_calories_cost < 0.5 * self.state.calories:
+        expected_calories_cost  = self.state.eggCost \
+                                  + 1.2*OFFSPRING_DONATION \
+                                  + 5*self.state.moveCost \
+                                  + self.state.lookCost
+        if self.state.size > 5 \
+                and expected_calories_cost < 0.5 * self.state.calories:
             self.logger.info("Laying offspring!")
             direction = choice([0, 2, 4, 6])
             er = self.egg(direction, OFFSPRING_DONATION)
             if er.succeeded:
                 self.logger.info("Successfully layed an egg!")
                 self.state = er.parentDinoState
-                self.logger.info("STATE: %s" % self.state)
+                self.logger.info("STATE: %s" % self.stat())
                 rc = Direction._RELATIVE_COORDINATES[direction]
                 p = self.position + Coordinate(rc[1], rc[0])
                 EGG_POOL.add((er.eggID, p.column, p.row))
@@ -283,14 +241,36 @@ class Dino(Dinosaur.Client, threading.Thread):
 
     def showPMReport(self):
         self.logger.info("PMR: size=%d" % self.state.size)
-        self.logger.info("PMR: calories=%d, burnt=%d, found=%d, ratio=%f" % (self.state.calories,
-                                                                             self.counters['calories_burnt'],
-                                                                             self.counters['calories_found'],
-                                                                             self.counters['calories_found'] != 0 and self.counters['calories_burnt']/self.counters['calories_found'] or -1))
-        self.logger.info("PMR: moves=%d, looks=%d, eggs=%d, actions=%d" % (self.counters['moves'],
-                                                                           self.counters['looks'],
-                                                                           self.counters['eggs'],
-                                                                           self.counters['actions']))
+        self.logger.info("PMR: calories=%d, burnt=%d, found=%d, ratio=%f" \
+            % (self.state.calories,
+               self.counters['calories_burnt'],
+               self.counters['calories_found'],
+               self.counters['calories_found'] != 0 and \
+                   self.counters['calories_burnt']/self.counters['calories_found'] or -1))
+        self.logger.info("PMR: moves=%d, looks=%d, eggs=%d, actions=%d" \
+            % (self.counters['moves'],
+               self.counters['looks'],
+               self.counters['eggs'],
+               self.counters['actions']))
+
+    def findClosest(self):
+        candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+        if candidates is not None and len(candidates) > 0:
+            closest_dist = candidates[0].coordinate.distance(self.position)
+            while closest_dist*self.state.moveCost > 0.75*self.state.calories \
+                    and len(DINO_POOL) > 1:
+                # try sleeping a little in the hope that somebody else wil find some shit...
+                self.logger.warning("SLEEP: nothing seems close enough!")
+                sleep(5)
+                candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+                closest_dist = candidates[0].coordinate.distance(self.position)
+            if closest_dist*self.state.moveCost > 0.5*self.state.calories:
+                    self.look(choice(list(set(range(8)) - getCone(direction, 2))))
+                    candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+            return (True, candidates)
+        else:
+            self.logger.warning("No candidates found. Moving on...")
+            return (False, None)
 
     def run(self):
         self.logger.info("Dino %s starting..." % self.name)
@@ -306,36 +286,24 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.eggID = rcr.eggID
             self.logger.info("Got an eggID: %s" % self.eggID)
         self.state = self.hatch(self.eggID)
-        self.logger.info("STATE: %s" % self.state)
+        self.logger.debug("NEW: %s" % self.state)
+        self.logger.info("STATE: %s" % self.stat())
 
         # Real algo here...
 
         try:
             while True:
                 self.growIfWise()
-                # Looking around
                 direction = choice(range(8))
-                self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
                 self.look(direction)
-                candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                if candidates is not None and len(candidates) > 0:
-                    closest_dist = candidates[0].coordinate.distance(self.position)
-                    if closest_dist*self.state.moveCost > 0.5*self.state.calories:
-                        self.look(choice(list(set(range(8)) - getCone(direction, 2))))
-                        candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                    if closest_dist*self.state.moveCost > 0.75*self.state.calories and len(DINO_POOL) > 1:
-                        # try sleeping a little in the hope that somebody else wil find some shit...
-                        self.logger.warning("SLEEP: nothing seems close enough!")
-                        sleep(5)
-                        candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                else:
-                    self.logger.warning("No candidates found. Moving on...")
+                ret, candidates = self.findClosest()
+                if not ret:
+                    self.logger.warning("Couldn't find anything.")
                     continue
                 while candidates is not None and len(candidates) > 0:
                     a = candidates.pop(0)
-                    self.logger.info("FOUND closest at %d, species='%s', size=%d" % (a.coordinate.distance(self.position),
-                                                                                     a.species,
-                                                                                     a.size))
+                    self.logger.info("FOUND closest at %d, species='%s', size=%d" \
+                        % (a.coordinate.distance(self.position), a.species, a.size))
                     if a.size > self.state.size + 2:
                         self.logger.info("Seems big! Discarding")
                         continue
@@ -346,18 +314,8 @@ class Dino(Dinosaur.Client, threading.Thread):
                         self.look(choice(range(8)))
                     self.layIfWise()
                     self.growIfWise()
-                    candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                    if candidates is not None and len(candidates) > 0:
-                        closest_dist = candidates[0].coordinate.distance(self.position)
-                        if closest_dist*self.state.moveCost > 0.5*self.state.calories:
-                            self.look(choice(list(set(range(8)) - getCone(direction, 2))))
-                            candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                        if closest_dist*self.state.moveCost > 0.75*self.state.calories and len(DINO_POOL) > 1:
-                            # try sleeping a little in the hope that somebody else wil find some shit...
-                            self.logger.warning("SLEEP: nothing seems close enough!")
-                            sleep(5)
-                            candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                    else:
+                    ret, candidates = self.findClosest()
+                    if not ret:
                         self.logger.warning("No candidates found. Moving on...")
                         break
         except YouAreDeadException, e:
@@ -371,7 +329,8 @@ class Dino(Dinosaur.Client, threading.Thread):
             for l in e.highScoreTable.splitlines():
                 self.logger.info(l)
             END_SCORE = e.score
-            BEST_SCORE = [int(l.split()[-1]) for l in e.highScoreTable.splitlines() if SCORE_NAME in l][0]
+            BEST_SCORE = [int(l.split()[-1]) \
+                          for l in e.highScoreTable.splitlines() if SCORE_NAME in l][0]
         except Exception, e:
             self.logger.debug(e)
             self.logger.error("An unheld exception occured!")
