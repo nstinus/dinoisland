@@ -258,7 +258,7 @@ class Dino(Dinosaur.Client, threading.Thread):
         if candidates is not None and len(candidates) > 0:
             closest_dist = candidates[0].coordinate.distance(self.position)
             while closest_dist*self.state.moveCost > 0.5*self.state.calories:
-                excluded_dirs = lastDirObserved is not None and getCone(direction, 2) or set()
+                excluded_dirs = lastDirObserved is not None and getCone(lastDirObserved, 2) or set()
                 self.look(choice(list(set(range(8)) - excluded_dirs)))
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 closest_dist = candidates[0].coordinate.distance(self.position)
