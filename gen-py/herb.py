@@ -183,6 +183,7 @@ class Dino(Dinosaur.Client, threading.Thread):
         self.counters['actions'] += 1
         self.counters['looks'] += 1
         self.counters['calories_burnt'] += self.state.lookCost
+        self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
         lr = Dinosaur.Client.look(self, direction)
         self.logger.debug(lr)
         if lr.succeeded:
@@ -317,7 +318,6 @@ class Dino(Dinosaur.Client, threading.Thread):
                 self.growIfWise()
                 # Looking around
                 direction = choice(range(8))
-                self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
                 self.look(direction)
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 if candidates is not None and len(candidates) > 0:
