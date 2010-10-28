@@ -180,13 +180,13 @@ class Dino(Dinosaur.Client, threading.Thread):
         threading.Thread.__init__(self, name=name)
 
     def look(self, direction):
-        self.counters['actions'] += 1
-        self.counters['looks'] += 1
-        self.counters['calories_burnt'] += self.state.lookCost
         self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
         lr = Dinosaur.Client.look(self, direction)
         self.logger.debug(lr)
         if lr.succeeded:
+            self.counters['actions'] += 1
+            self.counters['looks'] += 1
+            self.counters['calories_burnt'] += self.state.lookCost
             self.state = lr.myState
         if lr.succeeded and len(lr.thingsSeen) != 0:
             distances = [i.coordinate.distance(self.position) for i in lr.thingsSeen]
