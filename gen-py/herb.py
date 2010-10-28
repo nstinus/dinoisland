@@ -295,6 +295,18 @@ class Dino(Dinosaur.Client, threading.Thread):
                                                                            self.counters['eggs'],
                                                                            self.counters['actions']))
 
+    def findClosest(self):
+        candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+        if candidates is not None and len(candidates) > 0:
+            closest_dist = candidates[0].coordinate.distance(self.position)
+            if closest_dist*self.state.moveCost > 0.5*self.state.calories:
+                self.look(choice(list(set(range(8)) - getCone(direction, 2))))
+                candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+            return (True, candidates)
+        else:
+            self.logger.warning("No candidates found. Moving on...")
+            return (False, None)
+
     def run(self):
         self.logger.info("Dino %s starting..." % self.name)
         self.transport.open()
@@ -316,22 +328,16 @@ class Dino(Dinosaur.Client, threading.Thread):
         try:
             while True:
                 self.growIfWise()
-                # Looking around
                 direction = choice(range(8))
                 self.look(direction)
-                candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                if candidates is not None and len(candidates) > 0:
-                    if candidates[0].coordinate.distance(self.position)*self.state.moveCost > 0.5*self.state.calories:
-                        self.look(choice(list(set(range(8)) - getCone(direction, 2))))
-                        candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                else:
-                    self.logger.warning("No candidates found. Moving on...")
+                ret, candidates = self.findClosest()
+                if not ret:
+                    self.logger.warning("Couldn't find anything.")
                     continue
                 while candidates is not None and len(candidates) > 0:
                     a = candidates.pop(0)
-                    self.logger.info("FOUND closest at %d, species='%s', size=%d" % (a.coordinate.distance(self.position),
-                                                                                     a.species,
-                                                                                     a.size))
+                    self.logger.info("FOUND closest at %d, species='%s', size=%d" \
+                        % (a.coordinate.distance(self.position), a.species, a.size))
                     if a.size > self.state.size + 2:
                         self.logger.info("Seems big! Discarding")
                         continue
@@ -342,12 +348,8 @@ class Dino(Dinosaur.Client, threading.Thread):
                         self.look(choice(range(8)))
                     self.layIfWise()
                     self.growIfWise()
-                    candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                    if candidates is not None and len(candidates) > 0:
-                        if candidates[0].coordinate.distance(self.position)*self.state.moveCost > 0.5*self.state.calories:
-                            self.look(choice(list(set(range(8)) - getCone(direction, 2))))
-                            candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
-                    else:
+                    ret, candidates = self.findClosest()
+                    if not ret:
                         self.logger.warning("No candidates found. Moving on...")
                         break
         except YouAreDeadException, e:
