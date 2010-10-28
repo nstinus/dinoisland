@@ -127,6 +127,9 @@ class Dino(Dinosaur.Client, threading.Thread):
         Dinosaur.Client.__init__(self, self.protocol)
         threading.Thread.__init__(self, name=name)
 
+    def stat(self):
+        return "@%s, cal=%d, size=%d" % (self.position, self.state.calories, self.state.size)
+
     def look(self, direction):
         self.logger.info("Looking %s" % Direction._VALUES_TO_NAMES[direction])
         lr = Dinosaur.Client.look(self, direction)
@@ -207,7 +210,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                 self.logger.info(msg % "OK")
             else:
                 self.logger.warning(msg % "KO")
-        self.logger.info("STATE: %s" % self.state)
+        self.logger.info("STATE: %s" % self.stat())
 
     def layIfWise(self):
         expected_calories_cost  = self.state.eggCost \
@@ -222,7 +225,7 @@ class Dino(Dinosaur.Client, threading.Thread):
             if er.succeeded:
                 self.logger.info("Successfully layed an egg!")
                 self.state = er.parentDinoState
-                self.logger.info("STATE: %s" % self.state)
+                self.logger.info("STATE: %s" % self.stat())
                 rc = Direction._RELATIVE_COORDINATES[direction]
                 p = self.position + Coordinate(rc[1], rc[0])
                 EGG_POOL.add((er.eggID, p.column, p.row))
@@ -276,7 +279,8 @@ class Dino(Dinosaur.Client, threading.Thread):
             self.eggID = rcr.eggID
             self.logger.info("Got an eggID: %s" % self.eggID)
         self.state = self.hatch(self.eggID)
-        self.logger.info("STATE: %s" % self.state)
+        self.logger.debug("NEW: %s" % self.state)
+        self.logger.info("STATE: %s" % self.stat())
 
         # Real algo here...
 
