@@ -313,6 +313,9 @@ class Dino(Dinosaur.Client, threading.Thread):
             END_SCORE = e.score
             BEST_SCORE = [int(l.split()[-1]) \
                           for l in e.highScoreTable.splitlines() if SCORE_NAME in l][0]
+        except BadEggException, e:
+            self.logger.warning("BADEGG: %s; %s" % (self.eggID, e.message))
+            EGG_POOL.append(self.eggID)
         except Exception, e:
             self.logger.debug(e)
             self.logger.error("An unheld exception occured!")
