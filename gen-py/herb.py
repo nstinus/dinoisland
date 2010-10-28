@@ -153,13 +153,13 @@ class Dino(Dinosaur.Client, threading.Thread):
                 % Direction._VALUES_TO_NAMES[direction])
         return lr.succeeded
 
-    def move(self, dir):
-        mr = Dinosaur.Client.move(self, dir)
+    def move(self, direction):
+        mr = Dinosaur.Client.move(self, direction)
         self.logger.debug(mr)
         if mr.succeeded:
             self.logger.info("MOVE OK: %s. %s" \
-                % (Direction._VALUES_TO_NAMES[dir], mr.message))
-            t = Direction._RELATIVE_COORDINATES[dir]
+                % (Direction._VALUES_TO_NAMES[direction], mr.message))
+            t = Direction._RELATIVE_COORDINATES[direction]
             self.position += Coordinate(t[0], t[1])
             self.state = mr.myState
             self.counters['actions'] += 1
@@ -168,10 +168,10 @@ class Dino(Dinosaur.Client, threading.Thread):
             return True
         else:
             self.logger.warning("MOVE KO: %s. %s" \
-                % (Direction._VALUES_TO_NAMES[dir], mr.message))
-            direction = choice(list(set(Direction._VALUES_TO_NAMES.keys()) - set([dir,])))
-            self.move(direction)
-            self.look(direction)
+                % (Direction._VALUES_TO_NAMES[direction], mr.message))
+            new_dir = choice(list(set(Direction._VALUES_TO_NAMES.keys()) - set([direction,])))
+            self.move(new_dir)
+            self.look(new_dir)
             return False
 
     def moveTo(self, coords):
@@ -253,20 +253,23 @@ class Dino(Dinosaur.Client, threading.Thread):
                self.counters['eggs'],
                self.counters['actions']))
 
-    def findClosest(self):
+    def findClosest(self, lastDirObserved=None):
         candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
         if candidates is not None and len(candidates) > 0:
             closest_dist = candidates[0].coordinate.distance(self.position)
-            while closest_dist*self.state.moveCost > 0.75*self.state.calories \
-                    and len(DINO_POOL) > 1:
-                # try sleeping a little in the hope that somebody else wil find some shit...
-                self.logger.warning("SLEEP: nothing seems close enough!")
-                sleep(5)
+            while closest_dist*self.state.moveCost > 0.5*self.state.calories:
+                excluded_dirs = lastDirObserved is not None and getCone(direction, 2) or set()
+                self.look(choice(list(set(range(8)) - excluded_dirs)))
                 candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
                 closest_dist = candidates[0].coordinate.distance(self.position)
-            if closest_dist*self.state.moveCost > 0.5*self.state.calories:
-                    self.look(choice(list(set(range(8)) - getCone(direction, 2))))
+                times_slept = 0
+                while closest_dist*self.state.moveCost > 0.75*self.state.calories \
+                        and times_slept < 10:
+                    self.logger.warning("SLEEP: nothing seems close enough!")
+                    sleep(5)
+                    times_slept += 1
                     candidates = MAP_MANAGER.findClosest(self.position, EntityType.PLANT)
+                    closest_dist = candidates[0].coordinate.distance(self.position)
             return (True, candidates)
         else:
             self.logger.warning("No candidates found. Moving on...")
@@ -296,7 +299,7 @@ class Dino(Dinosaur.Client, threading.Thread):
                 self.growIfWise()
                 direction = choice(range(8))
                 self.look(direction)
-                ret, candidates = self.findClosest()
+                ret, candidates = self.findClosest(direction)
                 if not ret:
                     self.logger.warning("Couldn't find anything.")
                     continue
